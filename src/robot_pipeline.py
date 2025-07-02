@@ -1,38 +1,45 @@
-import argparse
-import os
-import logging
+import argparse, os, json
+from datetime import datetime
+from src.vision_bom import extract_bom
+from src.skeleton import generate_skeleton
+from src.parts_index import PartIndex
+from src.assembly_builder import build_assembly
 
-from src import vision_bom, skeleton, assembly_builder, parts_index
 
 def main():
-    parser = argparse.ArgumentParser(description="One-click CLI: image → BOM → skeleton → assembly")
-    parser.add_argument("--image", required=True, help="Path to input image")
-    parser.add_argument("--outdir", required=True, help="Directory for output files")
+    parser = argparse.ArgumentParser(description="Image → BOM → skeleton & assembly macros")
+    parser.add_argument("--image", required=True)
+    parser.add_argument("--outdir", required=True)
     args = parser.parse_args()
 
     os.makedirs(args.outdir, exist_ok=True)
 
-    # Step a: extract BOM from image
-    bom = vision_bom.extract_bom(args.image)
-    print("Extracted BOM:")
-    for entry in bom:
-        print(f"  {entry['qty']}x {entry['category']} {entry['model']}")
+    # 1. BOM
+    bom = extract_bom(args.image)
+    bom_path = os.path.join(args.outdir, "bom.json")
+    with open(bom_path, "w") as f:
+        json.dump(bom, f, indent=2)
+    print(f"BOM saved to {bom_path}")
 
-    # Step b: generate skeleton macro
-    skeleton_macro = skeleton.generate_skeleton(bom)
-    skeleton_macro_path = os.path.join(args.outdir, "skeleton.FCMacro")
-    with open(skeleton_macro_path, "w") as f:
-        f.write(skeleton_macro)
-    print(f"Skeleton macro written to: {skeleton_macro_path}")
+    # 2. Skeleton macro
+    sk_code = generate_skeleton(bom)
+    sk_path = os.path.join(args.outdir, "skeleton.FCMacro")
+    with open(sk_path, "w") as f:
+        f.write(sk_code)
+    print(f"Skeleton macro → {sk_path}")
 
-    # Step c: build parts index if needed and build assembly
-    idx = parts_index.PartIndex(index_path="data/parts")
-    idx.build_index()
-    assembly_macro = assembly_builder.build_assembly(bom, idx)
-    assembly_macro_path = os.path.join(args.outdir, "assembly.FCMacro")
-    with open(assembly_macro_path, "w") as f:
-        f.write(assembly_macro)
-    print(f"Assembly macro written to: {assembly_macro_path}")
+    # 3. Parts index & assembly macro
+    idx = PartIndex()
+    if idx.index is None or len(idx.parts) == 0:
+        print("Building parts index …")
+        idx.build_index("library/parts")
+    asm_code = build_assembly(bom, idx)
+    asm_path = os.path.join(args.outdir, "assembly.FCMacro")
+    with open(asm_path, "w") as f:
+        f.write(asm_code)
+    print(f"Assembly macro → {asm_path}")
+
+    print("Done ✅")
 
 if __name__ == "__main__":
     main()

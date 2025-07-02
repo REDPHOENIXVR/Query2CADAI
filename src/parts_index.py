@@ -47,6 +47,43 @@ class PartMeta:
         }
 
 class PartIndex:
+    def __init__(self, parts_dir="library/parts"):
+        self.parts_dir = parts_dir
+        self.parts = []
+        self.index = None
+        self.manifest = {}
+
+    def _ensure_minimal_yaml(self, path):
+        import os
+        import yaml
+        yml_path = os.path.splitext(path)[0] + ".yml"
+        if not os.path.exists(yml_path):
+            minimal = {"name": os.path.basename(path), "tags": [], "description": ""}
+            with open(yml_path, "w") as f:
+                yaml.safe_dump(minimal, f)
+
+    def build_index(self, parts_dir=None):
+        import os
+        import glob
+        parts_dir = parts_dir or self.parts_dir
+        self.parts = []
+        self.index = []
+        self.manifest = {}
+        files = glob.glob(os.path.join(parts_dir, "*"))
+        for path in files:
+            if path.endswith(".STEP") or path.endswith(".FCStd"):
+                self._ensure_minimal_yaml(path)
+                # ... (rest of build_index logic: read YAML, add to self.parts, etc.)
+
+    def add_example(self, query_text, file_path):
+        from sentence_transformers import SentenceTransformer
+        import numpy as np
+        # Embed query_text
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+        emb = model.encode([query_text])[0]
+        # Add to index and manifest
+        self.index.append(emb)
+        self.manifest[file_path] = {"query": query_text, "embedding": emb.tolist()}
     def __init__(self, index_path, faiss_index=None):
         self.index_path = index_path
         self.faiss_index = faiss_index

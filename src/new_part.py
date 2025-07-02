@@ -1,6 +1,7 @@
+#!/usr/bin/env python3
+
 import argparse
 import os
-import yaml
 
 TEMPLATE = {
     "category": "unknown",

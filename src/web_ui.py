@@ -29,6 +29,12 @@ def get_skeleton_macro(bom):
 
 def get_assembly_macro(bom):
     from src.parts_index import PartIndex
+
+pi_global = PartIndex.load()
+if pi_global.index is None or len(pi_global.parts) == 0:
+    pi_global.build_index("library/parts")
+
+# ... rest of file, later use pi_global instead of new PartIndex.load() when building assembly ...
     import src.assembly_builder as assembly_builder
     pi = PartIndex.load()
     if pi.index is None or len(pi.parts) == 0:
