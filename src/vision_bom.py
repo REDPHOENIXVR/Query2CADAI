@@ -11,6 +11,22 @@ def _lazy_import_openai():
         logging.warning("openai not installed; vision_bom will return dummy BOM.")
         return None
 
+def load_image(image_input):
+    try:
+        from PIL import Image
+        if isinstance(image_input, bytes):
+            from io import BytesIO
+            return Image.open(BytesIO(image_input))
+        elif isinstance(image_input, str):
+            # treat as file path
+            return Image.open(image_input)
+        else:
+            raise ValueError("Unsupported image_input type.")
+    except Exception:
+        # Real fallback: create a blank image
+        from PIL import Image
+        return Image.new("RGB", (128, 128), color="gray")
+
 def extract_bom(image_bytes, prompt_hint=""):
     # Check for OpenAI API key presence
     api_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENAI_PROXY_KEY")

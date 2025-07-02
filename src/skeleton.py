@@ -21,4 +21,5 @@ def generate_skeleton(bom, param=None):
         for idx, arm in enumerate(bom["arms"]):
             macro.append(f"arm{idx} = Part.makeCylinder(6, 50, FreeCAD.Vector({-30+idx*60},40,10))")
             macro.append(f"Part.show(arm{idx})")
+    macro.append("FreeCAD.ActiveDocument.recompute()")
     return "\n".join(macro)

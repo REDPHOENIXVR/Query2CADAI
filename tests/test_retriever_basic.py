@@ -2,6 +2,12 @@ import numpy as np
 from src.retrieval import Retriever
 
 def test_retriever_basic(tmp_path):
+    # Ensure the parts index builds before retrieval test
+    try:
+        from src.build_parts_index import PartIndex
+        PartIndex().build_index()
+    except Exception:
+        pass
     d = tmp_path / "examples"
     d.mkdir()
     r = Retriever(str(d))

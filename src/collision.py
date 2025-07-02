@@ -1,6 +1,6 @@
 import logging
 
-def check_collisions(step_files):
+def check_collisions(step_files, visualize=False):
     try:
         import pybullet as p
         import pybullet_data
@@ -10,7 +10,8 @@ def check_collisions(step_files):
     import time
     import os
 
-    physicsClient = p.connect(p.DIRECT)
+    client_mode = p.GUI if visualize else p.DIRECT
+    physicsClient = p.connect(client_mode)
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
     planeId = p.loadURDF("plane.urdf")
     object_ids = []

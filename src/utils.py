@@ -11,6 +11,17 @@ def ensure_dir(path):
 import os
 
 def ensure_startup_dirs():
+    """Ensure required directories exist at startup."""
+    dirs = [
+        "data/step_cache",
+        "results",
+        "data/upload_cache",
+        "data/parts_db",
+        "data/parts_index",
+        "data/images",  # add new directories as needed
+    ]
+    for d in dirs:
+        os.makedirs(d, exist_ok=True)
     os.makedirs("results", exist_ok=True)
     os.makedirs("data", exist_ok=True)
     # New required directories

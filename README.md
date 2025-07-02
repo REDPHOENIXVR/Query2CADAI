@@ -30,6 +30,11 @@ This workflow takes you from a robot image to a FreeCAD macro for assembly or sk
    - Use the macro in FreeCAD to visualize or modify the design.
    - For collision testing, use the `src/collision.py` module (requires pybullet).
 
+**NOTE:** After adding new STEP files, rebuild the parts index:
+```bash
+python -m src.build_parts_index
+```
+
 ## File Structure
 
 - `src/parts_index.py` : Parts metadata parse/index/query

@@ -3,5 +3,16 @@ pybullet
 python-multipart
 sentence-transformers
 faiss-cpu
+numpy
+pyyaml
+pandas
+pybullet
+gradio
+python-multipart
+pytest
+watchdog
+loguru
+pycryptodome
+faiss-cpu
 pandas
 gradio
