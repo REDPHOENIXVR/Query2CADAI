@@ -1,4 +1,23 @@
-import os, sys, requests, re
+import os
+from src.logger import get_logger
+
+logger = get_logger("utils")
+
+def ensure_dir(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
+        logger.info(f"Created directory: {path}")
+
+def ensure_startup_dirs():
+    """
+    Ensure required directories exist at program start.
+    """
+    dirs = [
+        "data/examples",
+        "results/explanations"
+    ]
+    for d in dirs:
+        ensure_dir(d), sys, requests, re
 import pyautogui
 import time
 import pyperclip

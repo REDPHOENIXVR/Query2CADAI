@@ -1,3 +1,8 @@
 sentence_transformers
 faiss-cpu
+numpy
+gradio
+pytest
+pycryptodome
+loguru
 watchdog

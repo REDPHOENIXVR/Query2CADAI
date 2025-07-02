@@ -1,119 +1,114 @@
 import os
 import json
-import uuid
 import threading
+import numpy as np
 
-class ExampleRetriever:
-    def __init__(self, data_dir, embedding_model_name="all-MiniLM-L6-v2"):
+from src.logger import get_logger
+
+logger = get_logger("retrieval")
+
+class Retriever:
+    """
+    Persistent Retriever with disk-based FAISS index and examples manifest.
+    Thread-safe with RLock. Supports positive and negative example addition.
+    """
+    def __init__(self, data_dir="data/examples", embedding_dim=768):
         self.data_dir = data_dir
-        self.embedding_model_name = embedding_model_name
-        self.examples = []
-        self.ids = []
-        self.embeddings = None
-        self.emb_model = None
+        self.index_path = os.path.join(data_dir, "faiss.index")
+        self.examples_path = os.path.join(data_dir, "examples.jsonl")
+        self.lock = threading.RLock()
+        self.embedding_dim = embedding_dim
         self.index = None
-        self.lock = threading.Lock()
+        self.examples = []
         self._import_libraries()
-        self.load_examples()
-        self.build_index()
+        self._load_or_build()
 
     def _import_libraries(self):
         try:
             import faiss
-            import sentence_transformers
         except ImportError:
-            raise ImportError(
-                "Required libraries for retrieval not found. "
-                "Please install 'sentence_transformers' and 'faiss-cpu'."
-            )
-
-    def load_examples(self):
-        self.examples = []
-        self.ids = []
-        if not os.path.exists(self.data_dir):
-            os.makedirs(self.data_dir, exist_ok=True)
-        for fname in os.listdir(self.data_dir):
-            if fname.endswith(".json"):
-                fpath = os.path.join(self.data_dir, fname)
-                try:
-                    with open(fpath, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                        if "query" in data and "code" in data:
-                            self.examples.append(data)
-                            self.ids.append(fname)
-                except Exception as e:
-                    print(f"Warning: Could not read {fname}: {e}")
-
-    def build_index(self):
-        with self.lock:
-            if not self.examples:
-                self.embeddings = None
-                self.index = None
-                return
-            try:
-                from sentence_transformers import SentenceTransformer
-                import faiss
-            except ImportError:
-                raise ImportError(
-                    "Required libraries for retrieval not found. "
-                    "Please install 'sentence_transformers' and 'faiss-cpu'."
-                )
-            self.emb_model = SentenceTransformer(self.embedding_model_name)
-            queries = [ex["query"] for ex in self.examples]
-            self.embeddings = self.emb_model.encode(queries, show_progress_bar=False)
-            dim = self.embeddings.shape[1]
-            self.index = faiss.IndexFlatL2(dim)
-            self.index.add(self.embeddings)
-
-    def get_similar_examples(self, query, k=3):
-        with self.lock:
-            if not self.examples or self.index is None:
-                return []
-            try:
-                import numpy as np
-                from sentence_transformers import SentenceTransformer
-            except ImportError:
-                raise ImportError(
-                    "Required libraries for retrieval not found. "
-                    "Please install 'sentence_transformers' and 'faiss-cpu'."
-                )
-            if self.emb_model is None:
-                from sentence_transformers import SentenceTransformer
-                self.emb_model = SentenceTransformer(self.embedding_model_name)
-            query_emb = self.emb_model.encode([query])
-            D, I = self.index.search(query_emb, min(k, len(self.examples)))
-            return [self.examples[i] for i in I[0]]
-
-    def add_example(self, query, code):
-        # Write to disk first
-        uid = str(uuid.uuid4())
-        path = os.path.join(self.data_dir, f"{uid}.json")
-        data = {"query": query, "code": code}
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        # Update memory
-        self.examples.append(data)
-        self.ids.append(f"{uid}.json")
-        # Update FAISS index
+            raise ImportError("Please install 'faiss-cpu'.")
         try:
-            from sentence_transformers import SentenceTransformer
-            import faiss
-            import numpy as np
+            import numpy
         except ImportError:
-            raise ImportError(
-                "Required libraries for retrieval not found. "
-                "Please install 'sentence_transformers' and 'faiss-cpu'."
-            )
-        if self.emb_model is None:
-            self.emb_model = SentenceTransformer(self.embedding_model_name)
-        emb = self.emb_model.encode([query])
-        if self.embeddings is None:
-            self.embeddings = emb
-        else:
-            self.embeddings = np.vstack([self.embeddings, emb])
-        if self.index is None:
-            dim = emb.shape[1]
-            self.index = faiss.IndexFlatL2(dim)
-            self.index.add(self.embeddings)
-        else:
-            self.index.add(emb)
+            raise ImportError("Please install 'numpy'.")
+
+    def _load_or_build(self):
+        with self.lock:
+            if os.path.exists(self.index_path) and os.path.exists(self.examples_path):
+                try:
+                    import faiss
+                    self.index = faiss.read_index(self.index_path)
+                    with open(self.examples_path, "r", encoding="utf-8") as f:
+                        self.examples = [json.loads(line) for line in f]
+                    logger.info(f"Loaded FAISS index and {len(self.examples)} examples from disk.")
+                except Exception as e:
+                    logger.warning(f"Failed to load index/manifest, building fresh: {e}")
+                    self._build_fresh()
+            else:
+                self._build_fresh()
+
+    def _build_fresh(self):
+        import faiss
+        self.examples = []
+        self.index = faiss.IndexFlatL2(self.embedding_dim)
+        self._save()
+
+    def _save(self):
+        import faiss
+        with self.lock:
+            faiss.write_index(self.index, self.index_path)
+            with open(self.examples_path, "w", encoding="utf-8") as f:
+                for ex in self.examples:
+                    f.write(json.dumps(ex) + "\n")
+        logger.debug("Saved FAISS index and examples manifest.")
+
+    def add_example(self, query, code, embedding, **kwargs):
+        """
+        Add a positive example (stored in index and manifest).
+        Extra fields: tags (list), notes (str), status (default: good).
+        """
+        with self.lock:
+            example = {
+                "query": query,
+                "code": code,
+                "tags": kwargs.get("tags", []),
+                "notes": kwargs.get("notes", ""),
+                "status": kwargs.get("status", "good")
+            }
+            self.examples.append(example)
+            if example["status"] == "good":
+                self.index.add(np.array([embedding]).astype(np.float32))
+            self._save()
+            logger.info(f"Example added: status={example['status']}")
+
+    def add_negative_example(self, query, error_msg):
+        """
+        Add a negative example (stored in manifest only, not FAISS).
+        """
+        with self.lock:
+            example = {
+                "query": query,
+                "code": "",
+                "tags": [],
+                "notes": error_msg,
+                "status": "bad"
+            }
+            self.examples.append(example)
+            self._save()
+            logger.info("Negative example added.")
+
+    def search(self, embedding, k=5):
+        """
+        Search top-k similar examples in the index.
+        """
+        with self.lock:
+            if self.index is None or self.index.ntotal == 0:
+                logger.warning("FAISS index empty, search returns no results.")
+                return []
+            D, I = self.index.search(np.array([embedding]).astype(np.float32), k)
+            return [self.examples[i] for i in I[0] if i < len(self.examples)]
+
+# Note: self.lock (RLock) is used for both reading and writing for simplicity.
+# Could use context managers or separate read/write locks for more complex needs,
+# but RLock is safe for current usage.
