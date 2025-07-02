@@ -16,3 +16,13 @@ python src/run.py --code_gen_model codellama/chatgpt/llama3/gpt4-turbo --reasoni
 ```
 
 4. The results will be stored in the results/ folder and new queries can be added in data/queries.txt
+
+```
+
+---
+
+## Continuous Learning (Hot-reload)
+You can drop your own JSON examples into `data/examples/` while the app is running, and they will be picked up automatically thanks to hot-reloading. The JSON format is the same as the generated examples.
+
+## Using OpenRouter
+To use OpenRouter models, set the environment variable `OPENROUTER_API_KEY` and pass `--code_gen_model openrouter-gpt-3.5-turbo` or similar. You can also use `--reasoning_model openrouter-claude-3-opus` etc.
