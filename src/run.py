@@ -8,9 +8,14 @@ from prompts import *
 from llm import *
 from gui_run import get_mouse_coordinates
 
+# === RAG: Retrieval Augmentation ===
+from retrieval import ExampleRetriever
+
+retriever = ExampleRetriever(data_dir="data/examples")
+
 def get_3d(code_model, reasoning_model, error_iter, refine_iter, code_temp, reasoning_temp, 
            code_api_key, reasoning_api_key, mode, vqa_model, vqa_threshold, human_feedback, base_url):
-    
+
     DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
     # Load the Captions and VQA model initially to avoid loading it repeatedly
 
@@ -18,7 +23,7 @@ def get_3d(code_model, reasoning_model, error_iter, refine_iter, code_temp, reas
     model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-flan-t5-xxl", load_in_8bit = True)
 
     print('Loaded')
-    
+
     vqa = t2v_metrics.VQAScore(model=vqa_model, device=DEVICE)
 
     print('Loaded vqa')
@@ -33,10 +38,15 @@ def get_3d(code_model, reasoning_model, error_iter, refine_iter, code_temp, reas
     # Iterate through all queries
     for idx, query in enumerate(dataset_queries):
         print(f"Starting query number {idx}...")
+
+        # --- RAG: retrieve similar examples, if any exist ---
+        similar_examples = retriever.get_similar_examples(query, k=3)
+        dynamic_examples = few_shot_from_examples(similar_examples) if similar_examples else ""
+
         # Get direct response
-        direct_steps_prompt = get_steps_prompt(query)
+        direct_steps_prompt = get_steps_prompt(query, dynamic_examples=dynamic_examples)
         direct_steps = get_answers(reasoning_model, reasoning_api_key, direct_steps_prompt, reasoning_temp, base_url)
-        direct_code_prompt = get_code_prompt(query, direct_steps)
+        direct_code_prompt = get_code_prompt(query, direct_steps, dynamic_examples=dynamic_examples)
         direct_code = get_answers(code_model, code_api_key, direct_code_prompt, code_temp, base_url)
         direct_code = remove_backticks(direct_code)
         direct_code_macro_file_path = f"{macro_store_path}/query_{idx}_direct_attempt_0.FCMacro"
@@ -86,9 +96,15 @@ def get_3d(code_model, reasoning_model, error_iter, refine_iter, code_temp, reas
             # Get the best possible code
             get_refined_outputs(caption, query, code_for_refinement, refine_iter, code_model, code_api_key, code_temp, idx, 
                                 error_iter, vqa, vqa_threshold, processor, model, base_url, human_feedback)
-            
+
         else:
             print("Stopping criteria is reached with direct model output. No need of refinement...")
+
+        # === RAG: After successful generation, save to examples and update index ===
+        try:
+            retriever.add_example(query, code_for_refinement)
+        except Exception as e:
+            print(f"Warning: Could not add example for continuous learning: {e}")
 
 
 

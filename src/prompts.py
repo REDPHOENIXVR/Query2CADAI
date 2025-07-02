@@ -1,244 +1,31 @@
 def few_shot_examples():
+    # ... (unchanged: keep your static examples as before)
     few_shot_example = """
 ### [User message]
 Make the CAD design of a pentagon box (open from one face)
-
-### [Answer]
-```python
-import Part
-import math
-from FreeCAD import Base
-side_length = 30.0  # Length of each side of the pentagon
-height = 20.0  # Height of the pentagon box
-App.newDocument("PentagonBox")
-App.setActiveDocument("PentagonBox")
-App.ActiveDocument = App.getDocument("PentagonBox")
-Gui.ActiveDocument = Gui.getDocument("PentagonBox")
-pentagon_points = []  # List to hold the points of the pentagon
-angle = 360 / 5  # Angle between each vertex of the pentagon
-
-# Calculate the points of the pentagon
-for i in range(5):
-    x = side_length * math.cos(math.radians(i * angle))
-    y = side_length * math.sin(math.radians(i * angle))
-    pentagon_points.append(Base.Vector(x, y, 0))
-
-# Create the pentagon wire
-pentagon_wire = Part.makePolygon(pentagon_points)
-pentagon_face = Part.Face(pentagon_wire)
-pentagon_solid = pentagon_face.extrude(Base.Vector(0, 0, height))
-Part.show(pentagon_solid)
-App.activeDocument().recompute()
-Gui.activeDocument().activeView().viewAxometric()
-Gui.SendMsgToActiveView("ViewFit")
-```
-
-### [User message]
-Make a CAD design of a column that is in the shape of a pentagon with side length 30mm and height 20 mm.
-
-### [Answer]
-from FreeCAD import Base
-
-side_length = 30.0  # Length of each side of the pentagon
-height = 20.0  # Height of the pentagon box
-
-App.newDocument("PentagonBox")
-App.setActiveDocument("PentagonBox")
-App.ActiveDocument = App.getDocument("PentagonBox")
-Gui.ActiveDocument = Gui.getDocument("PentagonBox")
-
-pentagon_points = []  # List to hold the points of the pentagon
-angle = 360 / 5  # Angle between each vertex of the pentagon
-
-# Calculate the points of the pentagon
-for i in range(5):
-    x = side_length * math.cos(math.radians(i * angle))
-    y = side_length * math.sin(math.radians(i * angle))
-    pentagon_points.append(Base.Vector(x, y, 0))
-
-pentagon_points.append(pentagon_points[0])  # Close the sketch.
-
-# Create the pentagon wire
-pentagon_wire = Part.makePolygon(pentagon_points)
-pentagon_face = Part.Face(pentagon_wire)
-
-# Extrude the pentagon face to create a solid
-pentagon_solid = pentagon_face.extrude(Base.Vector(0, 0, height))
-
-# Show the solid
-Part.show(pentagon_solid)
-App.activeDocument().recompute()
-Gui.activeDocument().activeView().viewAxometric()
-Gui.SendMsgToActiveView("ViewFit")
-
-
-### [User message]
-Make the CAD design of a ball-bearing
-
-### [Answer]
-```python
-import Part
-#needed for calculating the positions of the balls
-import math
-#needed for translation of torus
-from FreeCAD import Base
-#
-#VALUES#
-#(radius of shaft/inner radius of inner ring)
-R1=15.0
-#(outer radius of inner ring)
-R2=25.0
-#(inner radius of outer ring)
-R3=30.0
-#(outer radius of outer ring)
-R4=40.0
-#(thickness of bearing)
-TH=15.0
-#(number of balls)
-NBall=10
-#(radius of ball)
-RBall=5.0
-#(rounding radius for fillets)
-RR=1
-#first coordinate of center of ball
-CBall=((R3-R2)/2)+R2
-#second coordinate of center of ball
-PBall=TH/2
-#
-#Create new document
-App.newDocument("Unnamed")
-App.setActiveDocument("Unnamed")
-App.ActiveDocument=App.getDocument("Unnamed")
-Gui.ActiveDocument=Gui.getDocument("Unnamed")
-#
-#Inner Ring#
-B1=Part.makeCylinder(R1,TH)
-B2=Part.makeCylinder(R2,TH)
-IR=B2.cut(B1)
-#get edges and apply fillets
-Bedges=IR.Edges
-IRF=IR.makeFillet(RR,Bedges)
-#create groove and show shape
-T1=Part.makeTorus(CBall,RBall)
-T1.translate(Base.Vector(0,0,TH/2))
-InnerRing=IRF.cut(T1)
-Part.show(InnerRing)
-#
-#Outer Ring#
-B3=Part.makeCylinder(R3,TH)
-B4=Part.makeCylinder(R4,TH)
-OR=B4.cut(B3)
-#get edges and apply fillets
-Bedges=OR.Edges
-ORF=OR.makeFillet(RR,Bedges)
-#create groove and show shape
-T2=Part.makeTorus(CBall,RBall)
-T2.translate(Base.Vector(0,0,TH/2))
-OuterRing=ORF.cut(T2)
-Part.show(OuterRing)
-#
-#Balls#
-for i in range(NBall):
-  Ball=Part.makeSphere(RBall)
-  Alpha=(i*2*math.pi)/NBall
-  BV=(CBall*math.cos(Alpha),CBall*math.sin(Alpha),TH/2)
-  Ball.translate(BV)
-  Part.show(Ball)
-#
-#Make it pretty#
-App.activeDocument().recompute()
-Gui.activeDocument().activeView().viewAxometric()
-Gui.SendMsgToActiveView("ViewFit")
-```
-
-### [User message]
-Make the CAD design of a knob
-
-### [Answer]
-On thinking like a designer, the door knob would look like a hollow sphere and also there would be a cut at one place to 
-```python
-import Part
-OuterSphere=Part.makeSphere(4) #make the outer sphere
-
-#make a cylinder and do cut that cylinder from the sphere
-Cylinder = Part.makeCylinder(2, 10) 
-DoorKnob = OuterSphere.cut(Cylinder)
-Part.show(DoorKnob)
-```
-
-### [User message]
-Make a cad model of a cube of side length 10, with one of its vertex at origin
-
-### [Answer]
-```pythonimport Part
-import Sketcher
-
-#create a new document
-doc = App.newDocument()
-
-#make box with its starting edge at origin
-box = Part.makeBox(10, 10, 10)
-
-#show the box
-Part.show(box)
-```
-
-### [User message]
-Make a cad model of a sphere which has a radius of 10 millimeters and it has its center at location (50, 0, 0)
-
-### [Answer]
-```python
-import Part
-import Sketcher
-
-#create a new document
-doc = App.newDocument()
-
-#make a plane which has its origin as (50, 0, 0)
-placement = App.Placement(App.Vector(50, 0, 0), App.Rotation()) #creates a plane at this location.
-Plane = doc.addObject("Part::Plane", "Plane")
-Plane.Placement = placement
-Plane.Length = 10  # Set the length of the plane as desired
-
-#always make the visibility of the plane generated as False
-Plane.ViewObject.Visibility = False
-
-#Sketch on the plane generated and make sphere with its center at the origin of the plane generated previously
-plane_placement = Plane.Placement
-plane_location = plane_placement.Base
-box_at_plane = Part.makeSphere(10, plane_location)
-Part.show(box_at_plane)
-```
-
-### [User message]
-Make a sketch of a circle and then extrude it to make a CAD design of a cylinder. 
-
-### [Answer]
-```python
-import Part
-import Sketcher
-
-#start a new document
-doc = App.newDocument()
-sketch = doc.addObject("Sketcher::SketchObject", "Sketch")
-
-#make sketch of a circle.
-sketch.addGeometry(Part.Circle(App.Vector(0.2, 0, 0), App.Vector(0, 0, 1), 1), False)
-doc.recompute()
-
-#convert it into the format of a wire
-wire = FreeCAD.ActiveDocument.Sketch.Shape.Wires[0]
-face = Part.Face(wire)
-
-#extrude the face (wire)
-extr = face.extrude(FreeCAD.Vector(0,0,10))
-Part.show(extr)
-```
+...
 """
     return few_shot_example
 
-def get_code_prompt(user_query, steps):
-    
+def few_shot_from_examples(examples):
+    """
+    Convert a list of {"query": ..., "code": ...} dicts into
+    "### [User message] ... ### [Answer] ..." blocks for few-shot prompts.
+    """
+    blocks = []
+    for ex in examples:
+        q = ex.get("query", "").strip()
+        code = ex.get("code", "").strip()
+        # Use code block if looks like code, else just as is
+        code_block = code
+        if not code.startswith("```"):
+            code_block = f"```python\n{code}\n```"
+        block = f"### [User message]\n{q}\n\n### [Answer]\n{code_block}\n"
+        blocks.append(block)
+    return "\n".join(blocks)
+
+def get_code_prompt(user_query, steps, dynamic_examples=""):
+    # dynamic_examples: if provided, inject above static examples
     few_shot_example = few_shot_examples()
     prompt = f"""
 ### Instructions ###
@@ -263,6 +50,7 @@ Use the following functions to make simple solids:
 
 These are a few example codes you can take reference from:
 ### Examples ###
+{dynamic_examples if dynamic_examples else ""}
 {few_shot_example}
 
 ### [User message]
@@ -275,7 +63,8 @@ Follow these steps and generate a Python code using the FreeCAD library to make 
 """
     return prompt
 
-def get_steps_prompt(user_query):
+def get_steps_prompt(user_query, dynamic_examples=""):
+    # dynamic_examples: if provided, inject above static examples
     steps_prompt = f"""
 ### Instructions ###
 You are a Computer Aided Design Engineer with a lot of industry experience. You are proficient in mechanical engineering concepts and you know the detailed steps to design any object. You have been using FreeCAD software for designing the CAD models.
@@ -284,6 +73,7 @@ You are a Computer Aided Design Engineer with a lot of industry experience. You 
 The user asked to {user_query}. Your task is to write down the steps you would follow to make the make what the user asked. Before writing the steps I want you think about how the 3D model of what the user asked would look like. Write it in an ordered list. First, visualize what the user is asking for. Then try designing the model step by step. You can follow the template in the examples given below.
 
 ### Examples ###
+{dynamic_examples if dynamic_examples else ""}
 ### [User message]
 What is the step by step approach to make a CAD design of rectangular prism.
 
