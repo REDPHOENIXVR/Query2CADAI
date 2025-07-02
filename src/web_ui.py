@@ -183,10 +183,10 @@ def launch_web_ui():
             thumbs_down = gr.Button("👎 Needs Fix")
 
         def feedback_good(query, macro):
+            # Use the global retriever and add the real example for instant learning
             from src.retrieval import Retriever
             retriever = Retriever()
-            # TODO: embedding placeholder
-            retriever.add_example(query, macro, [0]*768)
+            retriever.add_example(query, macro)
             return "Feedback recorded!"
 
         def feedback_bad(query, macro):
