@@ -1,8 +1,7 @@
-sentence_transformers
+pyyaml
+pybullet
+python-multipart
+sentence-transformers
 faiss-cpu
-numpy
+pandas
 gradio
-pytest
-pycryptodome
-loguru
-watchdog

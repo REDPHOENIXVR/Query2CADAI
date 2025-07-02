@@ -8,7 +8,15 @@ def ensure_dir(path):
         os.makedirs(path)
         logger.info(f"Created directory: {path}")
 
+import os
+
 def ensure_startup_dirs():
+    os.makedirs("results", exist_ok=True)
+    os.makedirs("data", exist_ok=True)
+    # New required directories
+    os.makedirs("library/parts", exist_ok=True)
+    os.makedirs("library/index", exist_ok=True)
+    os.makedirs("results/bom", exist_ok=True)
     """
     Ensure required directories exist at program start.
     """
