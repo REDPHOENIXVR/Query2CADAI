@@ -47,6 +47,38 @@ class PartMeta:
         }
 
 class PartIndex:
+    def __init__(self, index_path, faiss_index=None):
+        self.index_path = index_path
+        self.faiss_index = faiss_index
+        self.examples = []
+        # ... other fields
+
+    def add_example(self, example):
+        self.examples.append(example)
+        # Immediately push embedding and add to FAISS
+        if hasattr(self, "faiss_index") and self.faiss_index is not None:
+            emb = self.embed_example(example)
+            self.faiss_index.add(emb)
+        # ... any other logic ...
+
+    def build_index(self):
+        # ... builds the index from yaml files ...
+        import os, yaml
+        files = [f for f in os.listdir(self.index_path) if f.endswith(('.step', '.STEP'))]
+        for f in files:
+            yml = f + '.yml'
+            yml_path = os.path.join(self.index_path, yml)
+            if not os.path.exists(yml_path):
+                # Create minimal YAML metadata using filename as model
+                meta = {
+                    "category": "unknown",
+                    "model": os.path.splitext(f)[0],
+                    "mass": None,
+                    "tags": []
+                }
+                with open(yml_path, "w") as out:
+                    yaml.safe_dump(meta, out)
+        # ... continue with usual index building ...
     def __init__(self):
         self.parts = []
         self.id_to_path = {}

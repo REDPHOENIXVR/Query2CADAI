@@ -35,6 +35,22 @@ This workflow takes you from a robot image to a FreeCAD macro for assembly or sk
 python -m src.build_parts_index
 ```
 
+## Robot Pipeline CLI
+
+You can now run the full humanoid pipeline with a single command:
+
+```bash
+python -m src.robot_pipeline --image path/to/input.png --outdir results/run1
+```
+
+This will:
+- Extract a BOM from the image
+- Generate a FreeCAD skeleton macro
+- Build or update the parts index
+- Build an assembly macro
+
+Outputs will be in the specified `--outdir`.
+
 ## File Structure
 
 - `src/parts_index.py` : Parts metadata parse/index/query

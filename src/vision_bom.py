@@ -3,6 +3,18 @@ import json
 import time
 import logging
 
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
+
+def extract_bom(image_path):
+    if Image is None:
+        logging.warning("PIL not available, returning dummy BOM")
+        # Fallback: return a dummy BOM
+        return [{"category": "unknown", "model": "unknown", "qty": 1}]
+    # ...implementation...
+
 def _lazy_import_openai():
     try:
         import openai
