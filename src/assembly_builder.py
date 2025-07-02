@@ -3,6 +3,9 @@ def build_assembly(bom, part_index):
     Returns a FreeCAD macro string to import STEP parts and place them.
     Falls back to simple primitive geometry if retrieval fails.
     """
+    # Import here to avoid circular import
+    # from src.parts_index import PartIndex
+
     macro = []
     macro.append("import FreeCAD, ImportGui, Part, Draft")
     macro.append("doc = FreeCAD.ActiveDocument")

@@ -31,6 +31,8 @@ def get_assembly_macro(bom):
     from src.parts_index import PartIndex
     import src.assembly_builder as assembly_builder
     pi = PartIndex.load()
+    if pi.index is None or len(pi.parts) == 0:
+        pi.build_index()
     return assembly_builder.build_assembly(bom, pi)
 
 def save_macro_file(macro_code, fname):
