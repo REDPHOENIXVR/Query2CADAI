@@ -1,0 +1,12 @@
+faiss-cpu
+gradio
+loguru
+numpy
+pandas
+pybullet
+pycryptodome
+pytest
+python-multipart
+pyyaml
+sentence-transformers
+watchdog

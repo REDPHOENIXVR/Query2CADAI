@@ -4,11 +4,45 @@ import requests
 import openai
 from openai import OpenAI
 
-def get_answers(model, api_key, query, temp, base_url = None) -> str:
+def get_answers(model, api_key, query, temp, base_url=None) -> str:
     """
-    Given the prompt: Get the LLM response for that particular prompt.
-    Model Used: CodeLlama 70b
+    Get the LLM response for the given prompt.
+    Supports: CodeLlama, ChatGPT, GPT-4 Turbo, Llama3, OpenRouter.
     """
+    # === OpenRouter Support ===
+    if model.startswith("openrouter"):
+        # Parse model name: everything after "openrouter-" is the remote model name
+        openrouter_prefix = "openrouter"
+        model_actual = "gpt-3.5-turbo"
+        if model == openrouter_prefix:
+            model_actual = "gpt-3.5-turbo"
+        elif model.startswith("openrouter-"):
+            model_actual = model[len("openrouter-") :]
+            if not model_actual:
+                model_actual = "gpt-3.5-turbo"
+        # API key logic
+        if not api_key:
+            api_key = os.getenv("OPENROUTER_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "OpenRouter API key not provided. Please set OPENROUTER_API_KEY environment variable or pass via --code_gen_api_key/--reasoning_api_key."
+            )
+        base_url_actual = base_url if base_url else "https://openrouter.ai/api/v1"
+        client = OpenAI(api_key=api_key, base_url=base_url_actual)
+        message = {
+            "role": "user",
+            "content": query,
+        }
+        response = client.chat.completions.create(
+            model=model_actual,
+            messages=[message],
+            stop=["<END>", "### [User message]", "\n\n\n\n\n"],
+            temperature=temp,
+            max_tokens=3000,
+        )
+        output = response.choices[0].message.content
+        print(output)
+        return output
 
     if model == "codellama":
         os.environ["TOGETHER_API_KEY"] = api_key

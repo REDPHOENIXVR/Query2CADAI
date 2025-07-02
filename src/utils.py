@@ -1,4 +1,41 @@
-import os, sys, requests, re
+import os
+from src.logger import get_logger
+
+logger = get_logger("utils")
+
+def ensure_dir(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
+        logger.info(f"Created directory: {path}")
+
+import os
+
+def ensure_startup_dirs():
+    dirs = [
+        "data/examples",
+        "data/cache",
+        "library/parts",
+        "library/index",
+        "results/bom",
+        "results/code",
+        "results/images",
+        "results/explanations",
+    ]
+    for d in dirs:
+        ensure_dir(d)
+    """Ensure required directories exist at startup."""
+    dirs = [
+        "data/examples",
+        "data/cache",
+        "library/parts",
+        "library/index",
+        "results/bom",
+        "results/code",
+        "results/images",
+        "results/explanations"
+    ]
+    for d in dirs:
+        ensure_dir(d)
 import pyautogui
 import time
 import pyperclip
