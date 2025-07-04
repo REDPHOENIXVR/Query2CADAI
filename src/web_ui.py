@@ -9,6 +9,8 @@ import src.utils as utils
 import os
 import json
 import logging
+from src.parts_index import PartIndex
+import src.assembly_builder as assembly_builder
 
 def _lazy_import_pandas():
     try:
@@ -23,6 +25,11 @@ def _lazy_import():
     import importlib
     return importlib
 
+# Set up global PartIndex cache
+pi_global = PartIndex.load()
+if pi_global.index is None or len(pi_global.parts) == 0:
+    pi_global.build_index("library/parts")
+
 # New: Import robot pipeline modules lazily
 def get_bom_from_image(image_bytes, prompt_hint=""):
     import src.vision_bom as vision_bom
@@ -33,18 +40,8 @@ def get_skeleton_macro(bom):
     return skeleton.generate_skeleton(bom, None)
 
 def get_assembly_macro(bom):
-    from src.parts_index import PartIndex
-
-pi_global = PartIndex.load()
-if pi_global.index is None or len(pi_global.parts) == 0:
-    pi_global.build_index("library/parts")
-
-# ... rest of file, later use pi_global instead of new PartIndex.load() when building assembly ...
-    import src.assembly_builder as assembly_builder
-    pi = PartIndex.load()
-    if pi.index is None or len(pi.parts) == 0:
-        pi.build_index()
-    return assembly_builder.build_assembly(bom, pi)
+    # build assembly using cached global PartIndex
+    return assembly_builder.build_assembly(bom, pi_global)
 
 def save_macro_file(macro_code, fname):
     os.makedirs("results", exist_ok=True)
