@@ -1,5 +1,10 @@
 try:
     import gradio as gr
+    HAS_GRADIO = True
+except ImportError:
+    gr = None  # type: ignore
+    HAS_GRADIO = False
+
 import src.utils as utils
 import os
 import json
@@ -138,12 +143,13 @@ def ui_main():
     return demo
 
 if __name__ == "__main__":
-    utils.ensure_startup_dirs()
-    demo = ui_main()
-    demo.launch()
-    HAS_GRADIO = True
-except ImportError:
-    HAS_GRADIO = False
+    if HAS_GRADIO:
+        utils.ensure_startup_dirs()
+        ui_main().launch()
+    else:
+        # logger is set up below
+        logger = logging.getLogger("web_ui")
+        logger.warning("Gradio not installed; skipping web UI launch.")
 
 from src.cache import cached_get_answers
 from src.prompts import get_parametric_prompt, get_explanation_prompt
