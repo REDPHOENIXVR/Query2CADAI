@@ -10,3 +10,12 @@ python-multipart
 pyyaml
 sentence-transformers
 watchdog
+python-dotenv
+t2v_metrics
+pyautogui
+pyperclip
+requests
+torch
+transformers
+pillow
+git+https://github.com/openai/CLIP.git
