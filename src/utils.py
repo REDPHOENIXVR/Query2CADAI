@@ -36,9 +36,17 @@ def ensure_startup_dirs():
     ]
     for d in dirs:
         ensure_dir(d)
-import pyautogui
+
+# Safe import for desktop automation libraries
+try:
+    import pyautogui
+    import pyperclip
+except Exception as e:
+    pyautogui = None
+    pyperclip = None
+    logger.warning(f"pyautogui unavailable: {e}")
+
 import time
-import pyperclip
 import logging
 from PIL import Image
 from prompts import *
@@ -86,7 +94,10 @@ def gui_sequence(macro_code_path, img_path):
     Runs the entire sequence -- opening FreeCAD, running generated code, capturing the isometric image,
     returning the error code if there is any.
     """
-    
+    if pyautogui is None:
+        logger.warning("gui_sequence called but pyautogui is not available in this environment.")
+        return "pyautogui not available"
+
     pyautogui.hotkey('win') #Open Run in windows
     time.sleep(.5)
     pyautogui.typewrite('FreeCAD')  
