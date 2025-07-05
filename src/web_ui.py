@@ -91,7 +91,7 @@ def ui_main():
         gr.Markdown("# Query2CAD Humanoid Robot Pipeline")
         with gr.Row():
             with gr.Column():
-                image_input = gr.Image(type="bytes", label="Upload Robot Image")
+                image_input = gr.Image(type="filepath", label="Upload Robot Image")
                 prompt_hint = gr.Textbox(label="Prompt hint (optional)", value="")
                 extract_btn = gr.Button("Extract BOM")
             with gr.Column():
