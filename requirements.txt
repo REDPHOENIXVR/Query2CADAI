@@ -9,6 +9,7 @@ pytest
 python-multipart
 pyyaml
 sentence-transformers
+timm==0.9.12  # pin to keep ImageNetInfo for transformers/gemma3n
 watchdog
 python-dotenv
 t2v_metrics
