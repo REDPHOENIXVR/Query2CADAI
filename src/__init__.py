@@ -1,3 +1,5 @@
+from src.timm_compat import *  # noqa: F401
+
 import os, sys
 _current_dir = os.path.dirname(__file__)
 if _current_dir not in sys.path:
