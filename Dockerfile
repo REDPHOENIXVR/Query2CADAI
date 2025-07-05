@@ -5,6 +5,7 @@ RUN apt-get update && \
 WORKDIR /app
 COPY . /app
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --force-reinstall "timm==0.9.12"
 
 # default to launching the web UI so no pyautogui / GUI automation is required
 CMD ["python", "-m", "src.web_ui"]

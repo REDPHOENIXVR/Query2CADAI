@@ -1,3 +1,8 @@
+# IMPORTANT: pin timm to 0.9.12 to ensure ImageNetInfo is available.
+# Newer timm versions (>=1.0) removed ImageNetInfo, which is required (indirectly by transformers/gemma3n/SentenceTransformer).
+# Do NOT upgrade or move this line, and ensure this pin is respected by all dependency installs (see Dockerfile for enforcement).
+timm==0.9.12  # pin to keep ImageNetInfo for transformers/gemma3n
+
 faiss-cpu
 gradio
 loguru
@@ -9,7 +14,6 @@ pytest
 python-multipart
 pyyaml
 sentence-transformers
-timm==0.9.12  # pin to keep ImageNetInfo for transformers/gemma3n
 watchdog
 python-dotenv
 t2v_metrics
