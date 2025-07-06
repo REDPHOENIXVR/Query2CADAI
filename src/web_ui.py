@@ -142,7 +142,7 @@ def ui_main():
 if __name__ == "__main__":
     if HAS_GRADIO:
         utils.ensure_startup_dirs()
-        ui_main().launch()
+        ui_main().launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)))
     else:
         # logger is set up below
         logger = logging.getLogger("web_ui")
@@ -206,4 +206,4 @@ def launch_web_ui():
         thumbs_up.click(fn=feedback_good, inputs=[query, macro_out], outputs=None)
         thumbs_down.click(fn=feedback_bad, inputs=[query, macro_out], outputs=None)
 
-    demo.launch()
+    demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)))

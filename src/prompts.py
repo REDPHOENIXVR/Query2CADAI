@@ -363,3 +363,34 @@ A rectangle
 """
 
     return prompt
+
+
+def get_parametric_prompt(user_query: str) -> str:
+    """
+    Build a parametric CAD macro request prompt based on user query.
+
+    Args:
+        user_query (str): The user's CAD task description.
+
+    Returns:
+        str: A prompt instructing the LLM to generate a parametric CAD macro.
+    """
+    return f"Generate a parametric CAD macro for: {user_query}"
+
+
+def get_explanation_prompt(macro_code: str) -> str:
+    """
+    Build a prompt asking the LLM to explain a FreeCAD macro step by step.
+
+    Args:
+        macro_code (str): The FreeCAD macro code to be explained.
+
+    Returns:
+        str: A prompt instructing the LLM to explain the macro code.
+    """
+    return (
+        "Explain step-by-step what the following FreeCAD macro does:\n\n"
+        "```python\n"
+        f"{macro_code}\n"
+        "```"
+    )
