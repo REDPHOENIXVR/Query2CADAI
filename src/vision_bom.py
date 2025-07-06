@@ -2,6 +2,7 @@ import os
 import json
 import time
 import logging
+import base64
 
 try:
     from PIL import Image
@@ -80,6 +81,17 @@ def extract_bom(image_bytes_or_path, prompt_hint=""):
                     "Keys: head, torso, legs (list), arms (optional). Each is a dict with type/material/tags. "
                     + (prompt_hint or "")
                 )
+
+                # --- Begin fix for OpenAI Vision API image payload ---
+                b64 = base64.b64encode(img_bytes).decode('ascii')
+                data_url = f"data:image/png;base64,{b64}"
+                data_url_size = len(data_url.encode('utf-8'))
+                if data_url_size > 19 * 1024 * 1024:  # 19 MB safeguard, API limit is 20 MB
+                    logging.warning(
+                        f"Image data URL size is {data_url_size/1024/1024:.2f} MB (>19 MB, may fail with OpenAI Vision API!)"
+                    )
+                # --- End fix ---
+
                 response = client.chat.completions.create(
                     model="gpt-4-vision-preview",
                     messages=[
@@ -87,7 +99,7 @@ def extract_bom(image_bytes_or_path, prompt_hint=""):
                             "role": "user",
                             "content": [
                                 {"type": "text", "text": prompt},
-                                {"type": "image_url", "image_url": {"type": "png", "data": img_bytes}},
+                                {"type": "image_url", "image_url": {"url": data_url}},
                             ],
                         }
                     ],
