@@ -115,9 +115,9 @@ def ui_main():
             # Sync DataFrame to BOM dict
             pd = _lazy_import_pandas()
             if not pd or df is None:
-                return {}, gr.update()
+                return {}
             bom = df_to_bom(pd.DataFrame(df))
-            return bom, gr.update()
+            return bom
 
         def do_skeleton(bom):
             macro = get_skeleton_macro(bom)
@@ -130,7 +130,7 @@ def ui_main():
             return gr.update(value=path, visible=True), macro
 
         extract_btn.click(do_extract, [image_input, prompt_hint], [bom_df, state_bom, skeleton_btn, assembly_btn])
-        bom_df.change(do_update_df, [bom_df], [state_bom, gr.update()])
+        bom_df.change(do_update_df, [bom_df], [state_bom])
         skeleton_btn.click(lambda bom: do_skeleton(bom), [state_bom], [macro_download, state_macro])
         assembly_btn.click(lambda bom: do_assembly(bom), [state_bom], [macro_download, state_macro])
 
