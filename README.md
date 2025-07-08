@@ -26,6 +26,7 @@ This workflow takes you from a robot image to a FreeCAD macro for assembly or sk
 
    **Chat with Query2CAD AI:**  
    The Web UI now includes a **Chat** tab, where you can have a free-form conversation with the Query2CAD AI assistant. You can type questions or requests in natural language, click **Send**, and receive AI responses in a conversational format. Use the **Clear** button to reset the chat history at any time. You can select the backend AI model using the radio button above the chat.  
+   You can also export your chat history at any time via the **Export History** button, which will generate a downloadable JSON file containing your conversation.
    This feature is useful for exploratory design, asking clarifying questions, or just experimenting with Query2CAD's capabilities interactively.
 
    - Upload a photo of a robot (or concept drawing).

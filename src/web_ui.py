@@ -9,6 +9,7 @@ import src.utils as utils
 import os
 import json
 import logging
+from datetime import datetime
 from src.parts_index import PartIndex
 import src.assembly_builder as assembly_builder
 
@@ -245,6 +246,9 @@ def launch_web_ui():
                     )
                     send_btn = gr.Button("Send", scale=1)
                     clear_btn = gr.Button("Clear", scale=1)
+                    export_btn = gr.Button("Export History", scale=1)
+
+                export_file = gr.File(label="Download Chat History (JSON)", visible=False, interactive=True, file_types=[".json"])
 
                 send_btn.click(
                     fn=chat_send,
@@ -255,6 +259,64 @@ def launch_web_ui():
                     fn=chat_clear,
                     inputs=None,
                     outputs=[chatbot, chat_state]
+                )
+
+                def export_chat_history(chat_history):
+                    if not chat_history or len(chat_history) == 0:
+                        return gr.update(visible=False, value=None)
+                    export_dir = os.path.join("results", "chat_history")
+                    utils.ensure_dir(export_dir)
+                    data = [
+                        {"user": u, "assistant": a}
+                        for (u, a) in chat_history
+                    ]
+                    now = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    fname = f"chat_{now}.json"
+                    fpath = os.path.join(export_dir, fname)
+                    with open(fpath, "w", encoding="utf-8") as f:
+                        json.dump(data, f, indent=2, ensure_ascii=False)
+                    return gr.update(value=fpath, visible=True)
+
+                export_btn.click(
+                    fn=export_chat_history,
+                    inputs=[chat_state],
+                    outputs=[export_file],
+                )
+
+                send_btn.click(
+                    fn=chat_send,
+                    inputs=[user_message, chat_state, chat_model],
+                    outputs=[chatbot, chat_state]
+                )
+                clear_btn.click(
+                    fn=chat_clear,
+                    inputs=None,
+                    outputs=[chatbot, chat_state]
+                )
+
+                def export_chat_history(chat_history):
+                    # chat_history is a list of (user, assistant) tuples
+                    if not chat_history or len(chat_history) == 0:
+                        return gr.update(visible=False, value=None)  # Nothing to export
+                    # Ensure export directory exists
+                    export_dir = os.path.join("results", "chat_history")
+                    utils.ensure_dir(export_dir)
+                    # Prepare data
+                    data = [
+                        {"user": u, "assistant": a}
+                        for (u, a) in chat_history
+                    ]
+                    now = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    fname = f"chat_{now}.json"
+                    fpath = os.path.join(export_dir, fname)
+                    with open(fpath, "w", encoding="utf-8") as f:
+                        json.dump(data, f, indent=2, ensure_ascii=False)
+                    return gr.update(value=fpath, visible=True)
+
+                export_btn.click(
+                    fn=export_chat_history,
+                    inputs=[chat_state],
+                    outputs=[export_file],
                 )
 
     demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)))
