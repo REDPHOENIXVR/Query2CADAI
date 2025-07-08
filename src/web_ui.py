@@ -147,12 +147,27 @@ def ui_main():
 
     return demo
 
+import argparse
+
+# ... (rest of code remains unchanged above)
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Query2CAD Web UI Launcher")
+    parser.add_argument(
+        "--mode",
+        choices=["chat", "pipeline"],
+        default="chat",
+        help="Which UI to launch: 'chat' (default, with Chat tab) or 'pipeline' (Humanoid Robot Pipeline only)."
+    )
+    args = parser.parse_args()
+
     if HAS_GRADIO:
         utils.ensure_startup_dirs()
-        ui_main().launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)))
+        if args.mode == "pipeline":
+            ui_main().launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)))
+        else:
+            launch_web_ui()
     else:
-        # logger is set up below
         logger = logging.getLogger("web_ui")
         logger.warning("Gradio not installed; skipping web UI launch.")
 
