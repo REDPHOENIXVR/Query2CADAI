@@ -11,7 +11,19 @@ class Retriever:
     """
     Persistent Retriever with disk-based FAISS index and examples manifest.
     Thread-safe with RLock. Supports positive and negative example addition.
+
+    Methods
+    -------
+    add_example(query, code, embedding=None, **kwargs)
+        Add a positive example. If embedding is None and status=="good", compute embedding automatically.
+    add_negative_example(query, error_msg)
+        Add a negative example (not indexed).
+    search(embedding, k=5)
+        Search top-k similar examples in the index.
+    ensure_example(query, code, status="good", **kwargs)
+        Public helper: add example, always computes embedding if needed.
     """
+
     def __init__(self, data_dir="data/examples", embedding_dim=768):
         self.data_dir = data_dir
         self.index_path = os.path.join(data_dir, "faiss.index")
@@ -20,6 +32,7 @@ class Retriever:
         self.embedding_dim = embedding_dim
         self.index = None
         self.examples = []
+        self._st_model = None  # cache for sentence-transformers model
         self._import_libraries()
         self._load_or_build()
 
@@ -48,10 +61,21 @@ class Retriever:
             else:
                 self._build_fresh()
 
-    def _build_fresh(self):
+    def _build_fresh(self, factory=None):
+        """
+        Build a fresh FAISS index and clear examples.
+
+        Parameters
+        ----------
+        factory : str, optional
+            Optional index factory string for faiss (default: None for IndexFlatL2).
+        """
         import faiss
         self.examples = []
-        self.index = faiss.IndexFlatL2(self.embedding_dim)
+        if factory is not None:
+            self.index = faiss.index_factory(self.embedding_dim, factory)
+        else:
+            self.index = faiss.IndexFlatL2(self.embedding_dim)
         self._save()
 
     def _save(self):
@@ -63,10 +87,33 @@ class Retriever:
                     f.write(json.dumps(ex) + "\n")
         logger.debug("Saved FAISS index and examples manifest.")
 
-    def add_example(self, query, code, embedding, **kwargs):
+    def _get_embedding(self, text):
+        """
+        Compute embedding for the given text using sentence-transformers.
+        Lazily loads model and caches it. Logs and returns None if unavailable.
+        """
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError:
+            logger.warning("[retrieval/embedding] sentence-transformers not installed; cannot compute embedding.")
+            return None
+        if self._st_model is None:
+            try:
+                self._st_model = SentenceTransformer("all-MiniLM-L6-v2")
+                logger.info("[retrieval/embedding] Loaded sentence-transformers model: all-MiniLM-L6-v2")
+            except Exception as e:
+                logger.warning(f"[retrieval/embedding] Could not load model: {e}")
+                return None
+        emb = self._st_model.encode([text])[0]
+        logger.info("[retrieval/embedding] Embedding generated and cached.")
+        return emb
+
+    def add_example(self, query, code, embedding=None, **kwargs):
         """
         Add a positive example (stored in index and manifest).
         Extra fields: tags (list), notes (str), status (default: good).
+        If embedding is None and status=='good', compute embedding automatically.
+        If embedding cannot be computed, log warning and still add to manifest.
         """
         with self.lock:
             example = {
@@ -78,9 +125,23 @@ class Retriever:
             }
             self.examples.append(example)
             if example["status"] == "good":
+                if embedding is None:
+                    embedding = self._get_embedding(query)
+                    if embedding is None:
+                        logger.warning("[retrieval/embedding] Example NOT added to FAISS (no embedding).")
+                        self._save()
+                        logger.info(f"Example added: status={example['status']} (manifest only)")
+                        return
                 self.index.add(np.array([embedding]).astype(np.float32))
+                logger.info(f"[retrieval/embedding] Example embedded and added to FAISS.")
             self._save()
             logger.info(f"Example added: status={example['status']}")
+
+    def ensure_example(self, query, code, status="good", **kwargs):
+        """
+        Public helper: add example, always computes embedding if needed.
+        """
+        self.add_example(query, code, embedding=None, status=status, **kwargs)
 
     def add_negative_example(self, query, error_msg):
         """
@@ -101,10 +162,22 @@ class Retriever:
     def search(self, embedding, k=5):
         """
         Search top-k similar examples in the index.
+
+        Parameters
+        ----------
+        embedding : np.ndarray
+            The embedding to search for.
+        k : int
+            Number of results to return.
+
+        Returns
+        -------
+        list
+            List of matching example dicts (possibly empty).
         """
         with self.lock:
-            if self.index is None or self.index.ntotal == 0:
-                logger.warning("FAISS index empty, search returns no results.")
+            if self.index is None or getattr(self.index, "ntotal", 0) == 0:
+                logger.warning("[retrieval/search] FAISS index empty or unavailable, returning empty list.")
                 return []
             D, I = self.index.search(np.array([embedding]).astype(np.float32), k)
             return [self.examples[i] for i in I[0] if i < len(self.examples)]
