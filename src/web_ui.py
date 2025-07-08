@@ -5,6 +5,13 @@ except ImportError:
     gr = None  # type: ignore
     HAS_GRADIO = False
 
+try:
+    import openai
+    HAS_OPENAI = True
+except ImportError:
+    openai = None
+    HAS_OPENAI = False
+
 import src.utils as utils
 import os
 import json
@@ -237,6 +244,26 @@ def launch_web_ui():
                 chatbot = gr.Chatbot(label="Query2CAD Conversation")
                 chat_state = gr.State([])  # List of (user, assistant) tuples
 
+                # --- Voice input section ---
+                # Only show if openai is installed
+                audio_components_visible = HAS_OPENAI
+
+                audio_row = None
+                audio_in = None
+                send_audio_btn = None
+                audio_warning_box = None
+
+                if audio_components_visible:
+                    with gr.Row():
+                        audio_in = gr.Audio(source="microphone", type="filepath", label="🎤 Record", scale=4)
+                        send_audio_btn = gr.Button("Send Audio", scale=1)
+                    audio_warning_box = gr.Markdown("", visible=False)
+                else:
+                    audio_warning_box = gr.Markdown(
+                        "⚠️ Voice input requires the `openai` Python package. Install with `pip install openai`.",
+                        visible=True,
+                    )
+
                 with gr.Row():
                     user_message = gr.Textbox(
                         label=None, 
@@ -250,6 +277,33 @@ def launch_web_ui():
 
                 export_file = gr.File(label="Download Chat History (JSON)", visible=False, interactive=True, file_types=[".json"])
 
+                # --- Audio-to-text and send logic ---
+                def transcribe_and_send(audio_filepath, chat_state, chat_model):
+                    # Hide warning box by default
+                    if not HAS_OPENAI:
+                        return gr.update(), chat_state, gr.update(value="⚠️ openai package not installed.", visible=True)
+                    if not audio_filepath:
+                        # No audio file to transcribe
+                        return gr.update(), chat_state, gr.update(value="⚠️ Please record audio before sending.", visible=True)
+                    api_key = os.environ.get("OPENAI_API_KEY", None)
+                    if not api_key:
+                        return gr.update(), chat_state, gr.update(value="⚠️ Please set your OPENAI_API_KEY environment variable to enable audio transcription.", visible=True)
+                    try:
+                        with open(audio_filepath, "rb") as f:
+                            transcript = openai.audio.transcriptions.transcribe("whisper-1", f, api_key=api_key)
+                        if isinstance(transcript, dict):
+                            text = transcript.get("text", "")
+                        else:
+                            text = transcript
+                        if not text.strip():
+                            return gr.update(), chat_state, gr.update(value="⚠️ No transcription result.", visible=True)
+                    except Exception as e:
+                        return gr.update(), chat_state, gr.update(value=f"⚠️ Transcription failed: {e}", visible=True)
+                    # Use chat_send to continue as user message
+                    chat_result, new_state = chat_send(text, chat_state, chat_model)
+                    return chat_result, new_state, gr.update(value="", visible=False)
+
+
                 send_btn.click(
                     fn=chat_send,
                     inputs=[user_message, chat_state, chat_model],
@@ -260,48 +314,19 @@ def launch_web_ui():
                     inputs=None,
                     outputs=[chatbot, chat_state]
                 )
+
+                if audio_components_visible:
+                    send_audio_btn.click(
+                        fn=transcribe_and_send,
+                        inputs=[audio_in, chat_state, chat_model],
+                        outputs=[chatbot, chat_state, audio_warning_box]
+                    )
 
                 def export_chat_history(chat_history):
                     if not chat_history or len(chat_history) == 0:
                         return gr.update(visible=False, value=None)
                     export_dir = os.path.join("results", "chat_history")
                     utils.ensure_dir(export_dir)
-                    data = [
-                        {"user": u, "assistant": a}
-                        for (u, a) in chat_history
-                    ]
-                    now = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    fname = f"chat_{now}.json"
-                    fpath = os.path.join(export_dir, fname)
-                    with open(fpath, "w", encoding="utf-8") as f:
-                        json.dump(data, f, indent=2, ensure_ascii=False)
-                    return gr.update(value=fpath, visible=True)
-
-                export_btn.click(
-                    fn=export_chat_history,
-                    inputs=[chat_state],
-                    outputs=[export_file],
-                )
-
-                send_btn.click(
-                    fn=chat_send,
-                    inputs=[user_message, chat_state, chat_model],
-                    outputs=[chatbot, chat_state]
-                )
-                clear_btn.click(
-                    fn=chat_clear,
-                    inputs=None,
-                    outputs=[chatbot, chat_state]
-                )
-
-                def export_chat_history(chat_history):
-                    # chat_history is a list of (user, assistant) tuples
-                    if not chat_history or len(chat_history) == 0:
-                        return gr.update(visible=False, value=None)  # Nothing to export
-                    # Ensure export directory exists
-                    export_dir = os.path.join("results", "chat_history")
-                    utils.ensure_dir(export_dir)
-                    # Prepare data
                     data = [
                         {"user": u, "assistant": a}
                         for (u, a) in chat_history
