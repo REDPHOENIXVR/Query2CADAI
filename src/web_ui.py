@@ -220,6 +220,7 @@ def launch_web_ui():
                 def feedback_good(query, macro):
                     from src.retrieval import Retriever
                     retriever = Retriever()
+                    # No embedding parameter needed; handled internally
                     retriever.add_example(query, macro)
                     return "Feedback recorded!"
 
