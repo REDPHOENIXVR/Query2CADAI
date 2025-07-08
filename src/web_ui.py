@@ -315,13 +315,9 @@ def launch_web_ui():
                     outputs=[chatbot, chat_state]
                 )
 
-                if audio_components_visible:
-                    send_audio_btn.click(
-                        fn=transcribe_and_send,
-                        inputs=[audio_in, chat_state, chat_model],
-                        outputs=[chatbot, chat_state, audio_warning_box]
-                    )
+                # Audio send logic: already connected above if HAS_OPENAI
 
+                # Export chat history (keep only one definition)
                 def export_chat_history(chat_history):
                     if not chat_history or len(chat_history) == 0:
                         return gr.update(visible=False, value=None)
