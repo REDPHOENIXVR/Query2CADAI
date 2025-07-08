@@ -7,7 +7,12 @@ from openai import OpenAI
 def get_answers(model, api_key, query, temp, base_url=None) -> str:
     """
     Get the LLM response for the given prompt.
-    Supports: CodeLlama, ChatGPT, GPT-4 Turbo, Llama3, OpenRouter.
+    Supports: CodeLlama (Together), ChatGPT, GPT-4 Turbo (OpenAI), Llama3 (Together), OpenRouter.
+
+    NOTE: 
+    - For OpenAI models, provide an OpenAI key (`OPENAI_API_KEY`).
+    - For OpenRouter models, provide an OpenRouter key (`OPENROUTER_API_KEY`).
+    - For Together models, provide a Together key (`TOGETHER_API_KEY`).
     """
     # === OpenRouter Support ===
     if model.startswith("openrouter"):
@@ -23,9 +28,9 @@ def get_answers(model, api_key, query, temp, base_url=None) -> str:
         # API key logic
         if not api_key:
             api_key = os.getenv("OPENROUTER_API_KEY")
-        if not api_key:
+        if not api_key or not api_key.startswith("sk-or-"):
             raise ValueError(
-                "OpenRouter API key not provided. Please set OPENROUTER_API_KEY environment variable or pass via --code_gen_api_key/--reasoning_api_key."
+                "OpenRouter API key not provided or not valid. Please set OPENROUTER_API_KEY environment variable or pass via --code_gen_api_key/--reasoning_api_key. OpenRouter keys start with 'sk-or-'."
             )
         base_url_actual = base_url if base_url else "https://openrouter.ai/api/v1"
         client = OpenAI(api_key=api_key, base_url=base_url_actual)
@@ -45,6 +50,11 @@ def get_answers(model, api_key, query, temp, base_url=None) -> str:
         return output
 
     if model == "codellama":
+        # Together API key must start with "api-"
+        if not api_key:
+            api_key = os.getenv("TOGETHER_API_KEY")
+        if not api_key:
+            raise ValueError("Together API key not provided. Please set TOGETHER_API_KEY.")
         os.environ["TOGETHER_API_KEY"] = api_key
         url = 'https://api.together.xyz/inference'
         headers = {
@@ -63,14 +73,19 @@ def get_answers(model, api_key, query, temp, base_url=None) -> str:
         "stop": ["<|EOT|>","<|begin▁of▁sentence|>","<|end▁of▁sentence|>", "<|\s|>", "### [User message]", "\n\n\n\n\n"]
         }
         response = requests.post(url, json=data, headers=headers)
-        #print(response.json())
-        #print('===================')
         text = response.json()['output']['choices'][0]['text']
         print(text)
 
         return text
     
     elif model == "chatgpt":
+        # OpenAI API key must start with "sk-"
+        if not api_key:
+            api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key or not api_key.startswith("sk-"):
+            raise ValueError(
+                "OpenAI API key not provided or not valid. Please set OPENAI_API_KEY environment variable or pass via --code_gen_api_key/--reasoning_api_key. OpenAI keys start with 'sk-'."
+            )
         client = OpenAI(api_key=api_key, base_url=base_url)
         message = {
             'role' : 'user',
@@ -89,6 +104,13 @@ def get_answers(model, api_key, query, temp, base_url=None) -> str:
         return output
     
     elif model == 'gpt4-turbo':
+        # OpenAI API key must start with "sk-"
+        if not api_key:
+            api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key or not api_key.startswith("sk-"):
+            raise ValueError(
+                "OpenAI API key not provided or not valid. Please set OPENAI_API_KEY environment variable or pass via --code_gen_api_key/--reasoning_api_key. OpenAI keys start with 'sk-'."
+            )
         client = OpenAI(api_key=api_key, base_url=base_url)
         message = {
             'role' : 'user',
@@ -108,6 +130,11 @@ def get_answers(model, api_key, query, temp, base_url=None) -> str:
 
     
     elif model == "llama3":
+        # Together API key must start with "api-"
+        if not api_key:
+            api_key = os.getenv("TOGETHER_API_KEY")
+        if not api_key:
+            raise ValueError("Together API key not provided. Please set TOGETHER_API_KEY.")
         os.environ["TOGETHER_API_KEY"] = api_key
         url = 'https://api.together.xyz/inference'
         headers = {
@@ -126,8 +153,6 @@ def get_answers(model, api_key, query, temp, base_url=None) -> str:
         "stop": ["<|EOT|>","<|begin▁of▁sentence|>","<|end▁of▁sentence|>", "<|\s|>", "### [User message]", "\n\n\n\n\n"]
         }
         response = requests.post(url, json=data, headers=headers)
-        #print(response.json())
-        #print('===================')
         text = response.json()['output']['choices'][0]['text']
         print(text)
 

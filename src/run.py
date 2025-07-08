@@ -138,6 +138,11 @@ if __name__ == "__main__":
     def is_openrouter_model(model_name):
         return model_name.startswith("openrouter")
 
+    # Key selection logic comments for clarity:
+    # - If using OpenRouter model, expects OPENROUTER_API_KEY (sk-or-...) via CLI or env
+    # - If using OpenAI model, expects OPENAI_API_KEY (sk-...) via CLI or env
+    # - If using Together models, expects TOGETHER_API_KEY (api-...) via CLI or env
+
     # === OpenRouter CLI wiring for code_gen_model ===
     if is_openrouter_model(args.code_gen_model):
         load_dotenv()
@@ -146,8 +151,8 @@ if __name__ == "__main__":
         args.code_gen_api_key = api_key
     elif args.code_gen_model == "chatgpt":
         load_dotenv()
-        api_key = os.getenv("PROXY_API_KEY")
-        base_url = os.getenv("PROXY_BASE_URL")
+        api_key = os.getenv("OPENAI_API_KEY") or args.code_gen_api_key
+        base_url = os.getenv("OPENAI_BASE_URL")  # Optional: allow override
         args.code_gen_api_key = api_key
     else:
         args.code_gen_api_key = args.code_gen_api_key
@@ -161,8 +166,8 @@ if __name__ == "__main__":
         args.reasoning_api_key = api_key
     elif args.reasoning_model == "chatgpt":
         load_dotenv()
-        api_key = os.getenv("PROXY_API_KEY")
-        base_url = os.getenv("PROXY_BASE_URL")
+        api_key = os.getenv("OPENAI_API_KEY") or args.reasoning_api_key
+        base_url = os.getenv("OPENAI_BASE_URL")
         args.reasoning_api_key = api_key
     else:
         args.reasoning_api_key = args.reasoning_api_key
