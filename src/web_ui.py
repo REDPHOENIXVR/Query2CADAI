@@ -172,38 +172,89 @@ def launch_web_ui():
         # TODO: Render CAD image (placeholder)
         return macro, explanation
 
+    def chat_send(user_message, chat_history, model):
+        # Append user message (assistant response = None for now)
+        if not user_message.strip():
+            return gr.update(), chat_history  # Don't submit empty
+        chat_history = chat_history or []
+        chat_history.append((user_message, None))
+        # Build prompt from history
+        prompt_parts = []
+        for u, a in chat_history[:-1]:
+            prompt_parts.append(f"User: {u}\nAI: {a if a is not None else ''}")
+        # Add latest message, with AI: as last line
+        prompt_parts.append(f"User: {user_message}\nAI:")
+        prompt = "\n".join(prompt_parts)
+        # Call model
+        assistant_response = cached_get_answers(model, prompt)
+        # Update last tuple with response
+        chat_history[-1] = (user_message, assistant_response)
+        return chat_history, chat_history
+
+    def chat_clear():
+        return [], []
+
     with gr.Blocks() as demo:
         gr.Markdown("# Query2CAD Web UI")
-        query = gr.Textbox(label="Enter CAD query", lines=3)
-        model = gr.Radio(MODEL_OPTIONS, value=MODEL_OPTIONS[0], label="Model")
-        parametric = gr.Checkbox(label="Parametric", value=False)
-        explain = gr.Checkbox(label="Explain steps", value=False)
-        run_btn = gr.Button("Run")
-        macro_out = gr.Textbox(label="Generated Macro")
-        explanation_out = gr.Textbox(label="Macro Explanation", visible=True)
-        with gr.Row():
-            thumbs_up = gr.Button("👍 Good")
-            thumbs_down = gr.Button("👎 Needs Fix")
+        with gr.Tabs():
+            with gr.Tab("Main"):
+                query = gr.Textbox(label="Enter CAD query", lines=3)
+                model = gr.Radio(MODEL_OPTIONS, value=MODEL_OPTIONS[0], label="Model")
+                parametric = gr.Checkbox(label="Parametric", value=False)
+                explain = gr.Checkbox(label="Explain steps", value=False)
+                run_btn = gr.Button("Run")
+                macro_out = gr.Textbox(label="Generated Macro")
+                explanation_out = gr.Textbox(label="Macro Explanation", visible=True)
+                with gr.Row():
+                    thumbs_up = gr.Button("👍 Good")
+                    thumbs_down = gr.Button("👎 Needs Fix")
 
-        def feedback_good(query, macro):
-            # Use the global retriever and add the real example for instant learning
-            from src.retrieval import Retriever
-            retriever = Retriever()
-            retriever.add_example(query, macro)
-            return "Feedback recorded!"
+                def feedback_good(query, macro):
+                    from src.retrieval import Retriever
+                    retriever = Retriever()
+                    retriever.add_example(query, macro)
+                    return "Feedback recorded!"
 
-        def feedback_bad(query, macro):
-            from src.retrieval import Retriever
-            retriever = Retriever()
-            retriever.add_negative_example(query, "User marked as bad result.")
-            return "Feedback recorded!"
+                def feedback_bad(query, macro):
+                    from src.retrieval import Retriever
+                    retriever = Retriever()
+                    retriever.add_negative_example(query, "User marked as bad result.")
+                    return "Feedback recorded!"
 
-        run_btn.click(
-            fn=infer,
-            inputs=[query, model, parametric, explain],
-            outputs=[macro_out, explanation_out]
-        )
-        thumbs_up.click(fn=feedback_good, inputs=[query, macro_out], outputs=None)
-        thumbs_down.click(fn=feedback_bad, inputs=[query, macro_out], outputs=None)
+                run_btn.click(
+                    fn=infer,
+                    inputs=[query, model, parametric, explain],
+                    outputs=[macro_out, explanation_out]
+                )
+                thumbs_up.click(fn=feedback_good, inputs=[query, macro_out], outputs=None)
+                thumbs_down.click(fn=feedback_bad, inputs=[query, macro_out], outputs=None)
+
+            with gr.Tab("Chat"):
+                gr.Markdown("### Chat with Query2CAD AI")
+                # Use the same model selection as in Main tab
+                chat_model = gr.Radio(MODEL_OPTIONS, value=MODEL_OPTIONS[0], label="Model")
+                chatbot = gr.Chatbot(label="Query2CAD Conversation")
+                chat_state = gr.State([])  # List of (user, assistant) tuples
+
+                with gr.Row():
+                    user_message = gr.Textbox(
+                        label=None, 
+                        placeholder="Ask Query2CAD AI...",
+                        lines=2,
+                        scale=6,
+                    )
+                    send_btn = gr.Button("Send", scale=1)
+                    clear_btn = gr.Button("Clear", scale=1)
+
+                send_btn.click(
+                    fn=chat_send,
+                    inputs=[user_message, chat_state, chat_model],
+                    outputs=[chatbot, chat_state]
+                )
+                clear_btn.click(
+                    fn=chat_clear,
+                    inputs=None,
+                    outputs=[chatbot, chat_state]
+                )
 
     demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)))
