@@ -1,7 +1,8 @@
 ─────────────────────────────
 ## Instant Feedback and Vision BOM
 
-- Giving a 👍 ("thumbs-up") instantly teaches the model: your query and its generated macro are added to the ExampleRetriever for future improvements.
+- Giving a 👍 ("thumbs-up") instantly teaches the model: your query and its generated macro are added to the ExampleRetriever for future improvements.  
+  > Now, a thumbs-up automatically computes and stores an embedding for your query—no manual setup required. This enables the retriever to learn from your feedback and improves future retrievals.
 - If you provide an OpenAI API key (or OpenRouter), Vision→BOM extraction uses the real OpenAI Vision endpoint (not a dummy) and validates the result. Otherwise, a placeholder/dummy BOM is used.
 
 # Query2CAD
@@ -23,6 +24,18 @@ This workflow takes you from a robot image to a FreeCAD macro for assembly or sk
 2. **Web UI**  
    - Launch with:  
      `python -m src.web_ui`
+
+   **Chat with Query2CAD AI:**  
+   The Web UI now includes a **Chat** tab, where you can have a free-form conversation with the Query2CAD AI assistant. You can type questions or requests in natural language, click **Send**, and receive AI responses in a conversational format. Use the **Clear** button to reset the chat history at any time. You can select the backend AI model using the radio button above the chat.  
+   You can also export your chat history at any time via the **Export History** button, which will generate a downloadable JSON file containing your conversation.
+
+   **NEW: Voice/Microphone Input**
+
+   The Chat tab supports voice input via your microphone. Click the 🎤 **Record** button, record your question, then click **Send Audio**. Your voice will be transcribed to text using OpenAI Whisper and sent as a message.  
+   > **Note:** This feature requires both the `openai` Python package and a valid `OPENAI_API_KEY` environment variable. If either is missing, the microphone input will be disabled.
+
+   This feature is useful for exploratory design, asking clarifying questions, or just experimenting with Query2CAD's capabilities interactively.
+
    - Upload a photo of a robot (or concept drawing).
    - Optionally provide a prompt hint.
    - Click **Extract BOM**:  
