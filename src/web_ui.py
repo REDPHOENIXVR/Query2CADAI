@@ -151,6 +151,8 @@ import argparse
 
 # ... (rest of code remains unchanged above)
 
+# Place this block at the very end of the file, after all function definitions (including launch_web_ui).
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Query2CAD Web UI Launcher")
     parser.add_argument(
