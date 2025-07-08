@@ -4,6 +4,21 @@ import time
 import logging
 import base64
 
+# Configurable Vision Model (default: gpt-4o, override with OPENAI_VISION_MODEL)
+VISION_MODEL = os.environ.get("OPENAI_VISION_MODEL", "gpt-4o")
+VISION_MODEL_FALLBACKS = ["gpt-4o-mini", "gpt-4o"]
+VISION_MODEL_DEPRECATED = {"gpt-4-vision-preview", "gpt-4-vision", "gpt-4-vision-preview-1106"}
+
+def _get_vision_model(requested=None):
+    """
+    Returns the model name for Vision API.
+    Logs a warning if the model is likely deprecated.
+    """
+    model = requested if requested is not None else VISION_MODEL
+    if model in VISION_MODEL_DEPRECATED:
+        logging.warning(f"OpenAI Vision model '{model}' is deprecated or unsupported. Consider using 'gpt-4o'.")
+    return model
+
 try:
     from PIL import Image
 except ImportError:
@@ -70,7 +85,7 @@ def extract_bom(image_bytes_or_path, prompt_hint=""):
         logging.warning(f"Image loading/resizing failed: {e}")
         img_bytes = image_bytes_or_path if isinstance(image_bytes_or_path, bytes) else None
 
-    if api_key and img_bytes:
+    def call_openai_vision(model_name):
         try:
             import openai
             from packaging import version
@@ -94,7 +109,7 @@ def extract_bom(image_bytes_or_path, prompt_hint=""):
                 # --- End fix ---
 
                 response = client.chat.completions.create(
-                    model="gpt-4-vision-preview",
+                    model=_get_vision_model(model_name),
                     messages=[
                         {
                             "role": "user",
@@ -108,6 +123,35 @@ def extract_bom(image_bytes_or_path, prompt_hint=""):
                     temperature=0,
                 )
                 raw = response.choices[0].message.content.strip()
+                return raw, None
+        except Exception as e:
+            return None, e
+        return None, Exception("OpenAI Vision API unavailable or version < 1.0.0")
+
+    # Try OpenAI Vision call(s) if possible
+    tried_models = []
+    last_error = None
+    if api_key and img_bytes:
+        # Always try user-specified model first (VISION_MODEL)
+        models_to_try = [VISION_MODEL]
+        # For fallback, only try fallback models not already tried (and only if the default was used)
+        if VISION_MODEL not in VISION_MODEL_FALLBACKS:
+            fallback_models = VISION_MODEL_FALLBACKS.copy()
+        else:
+            # if VISION_MODEL was already a fallback, try the others except it
+            fallback_models = [m for m in VISION_MODEL_FALLBACKS if m != VISION_MODEL]
+
+        # If the user did not override the model, allow fallback attempts
+        allow_fallback = (os.environ.get("OPENAI_VISION_MODEL") is None)
+
+        def is_404_error(exc):
+            return hasattr(exc, "status_code") and getattr(exc, "status_code", None) == 404 or \
+                "404" in str(exc) or "not found" in str(exc).lower()
+
+        for model_name in models_to_try:
+            tried_models.append(model_name)
+            raw, err = call_openai_vision(model_name)
+            if raw is not None:
                 vision_attempted = True
                 try:
                     # Try pydantic validation first
@@ -132,9 +176,48 @@ def extract_bom(image_bytes_or_path, prompt_hint=""):
                         bom = _json.loads(raw)
                     except Exception:
                         bom = None
-        except Exception as e:
-            logging.warning(f"Vision BOM API call failed: {e}")
-            bom = None
+                if bom:
+                    break  # Success
+            last_error = err
+            # If we get a 404 and fallback is allowed, try fallback models
+            if err and is_404_error(err) and allow_fallback:
+                for fallback_model in fallback_models:
+                    if fallback_model not in tried_models:
+                        logging.warning(
+                            f"Model '{model_name}' returned 404. Retrying with fallback model '{fallback_model}'."
+                        )
+                        tried_models.append(fallback_model)
+                        raw, err = call_openai_vision(fallback_model)
+                        if raw is not None:
+                            vision_attempted = True
+                            try:
+                                from pydantic import BaseModel
+                                class LegModel(BaseModel):
+                                    type: str
+                                    side: str = None
+                                    material: str = None
+                                    tags: list = []
+                                class BOMModel(BaseModel):
+                                    head: dict
+                                    torso: dict
+                                    legs: list
+                                    arms: list = []
+                                import json as _json
+                                parsed = _json.loads(raw)
+                                result = BOMModel(**parsed).model_dump()
+                                bom = result
+                            except Exception:
+                                import json as _json
+                                try:
+                                    bom = _json.loads(raw)
+                                except Exception:
+                                    bom = None
+                            if bom:
+                                break
+                        last_error = err
+                # Done all fallbacks
+            if bom:
+                break
 
     # Fallback: Dummy BOM
     if not bom:

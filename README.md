@@ -4,6 +4,7 @@
 - Giving a 👍 ("thumbs-up") instantly teaches the model: your query and its generated macro are added to the ExampleRetriever for future improvements.  
   > Now, a thumbs-up automatically computes and stores an embedding for your query—no manual setup required. This enables the retriever to learn from your feedback and improves future retrievals.
 - If you provide an OpenAI API key (or OpenRouter), Vision→BOM extraction uses the real OpenAI Vision endpoint (not a dummy) and validates the result. Otherwise, a placeholder/dummy BOM is used.
+  You can override the vision model via the `OPENAI_VISION_MODEL` env var (defaults to `gpt-4o`).
 
 # Query2CAD
 
