@@ -48,7 +48,8 @@ def extract_bom(image_bytes_or_path, prompt_hint=""):
     """
     import io
 
-    api_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENAI_PROXY_KEY")
+    # Only use OPENAI_API_KEY for OpenAI Vision endpoint (never OPENROUTER_API_KEY)
+    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENAI_PROXY_KEY")
     bom = None
     vision_attempted = False
 
