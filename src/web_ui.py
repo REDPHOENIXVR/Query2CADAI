@@ -95,8 +95,7 @@ def df_to_bom(df):
     return group
 
 def ui_main():
-    import gradio as gr
-
+    # Unified and cleaned-up pipeline UI with integrated Text→Image widgets.
     def do_generate(prompt):
         if not prompt.strip():
             return gr.update()
@@ -104,24 +103,15 @@ def ui_main():
         path = generate_image(prompt)
         return gr.update(value=path)
 
-    with gr.Blocks() as demo:
-        gr.Markdown("# Humanoid Robot Pipeline")
-        with gr.Tab("Humanoid Robot Pipeline"):
-            with gr.Row():
-                with gr.Column(scale=1):
-                    concept_prompt = gr.Textbox(label="Concept description", elem_id="concept_prompt")
-                    gen_image_btn = gr.Button("Generate Image", elem_id="gen_image_btn")
-                    image_input = gr.Image(label="Input Image", type="filepath", elem_id="image_input")
-                    gen_image_btn.click(
-                        do_generate,
-                        inputs=[concept_prompt],
-                        outputs=image_input,
-                    )
-                    # ... etc ...
+    import gradio as gr
+
     with gr.Blocks() as demo:
         gr.Markdown("# Query2CAD Humanoid Robot Pipeline")
         with gr.Row():
             with gr.Column():
+                # Text-to-image widgets integrated above image_input
+                concept_prompt = gr.Textbox(label="Concept description (optional)", lines=2, value="")
+                gen_image_btn = gr.Button("Generate Image")
                 image_input = gr.Image(type="filepath", label="Upload Robot Image")
                 prompt_hint = gr.Textbox(label="Prompt hint (optional)", value="")
                 extract_btn = gr.Button("Extract BOM")
@@ -134,6 +124,13 @@ def ui_main():
         state_bom = gr.State({})
         state_macro = gr.State("")
 
+        # Hook text→image generation button to do_generate, updating image_input
+        gen_image_btn.click(
+            do_generate,
+            inputs=[concept_prompt],
+            outputs=image_input,
+        )
+
         def do_extract(image, prompt_hint):
             if not image:
                 return gr.update(visible=False), {}, gr.update(visible=False), gr.update(visible=False)
@@ -143,7 +140,6 @@ def ui_main():
             return gr.update(visible=visible, value=df), bom, gr.update(visible=visible), gr.update(visible=visible)
 
         def do_update_df(df):
-            # Sync DataFrame to BOM dict
             pd = _lazy_import_pandas()
             if not pd or df is None:
                 return {}
@@ -165,7 +161,6 @@ def ui_main():
         skeleton_btn.click(lambda bom: do_skeleton(bom), [state_bom], [macro_download, state_macro])
         assembly_btn.click(lambda bom: do_assembly(bom), [state_bom], [macro_download, state_macro])
 
-        # Feedback button just log for now
         feedback.click(lambda: print("Feedback: thumbs up!"), None, None)
 
     return demo
