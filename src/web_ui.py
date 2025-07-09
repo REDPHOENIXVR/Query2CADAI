@@ -95,10 +95,23 @@ def df_to_bom(df):
     return group
 
 def ui_main():
+    # Unified and cleaned-up pipeline UI with integrated Text→Image widgets.
+    def do_generate(prompt):
+        if not prompt.strip():
+            return gr.update()
+        from src.image_generator import generate_image
+        path = generate_image(prompt)
+        return gr.update(value=path)
+
+    import gradio as gr
+
     with gr.Blocks() as demo:
         gr.Markdown("# Query2CAD Humanoid Robot Pipeline")
         with gr.Row():
             with gr.Column():
+                # Text-to-image widgets integrated above image_input
+                concept_prompt = gr.Textbox(label="Concept description (optional)", lines=2, value="")
+                gen_image_btn = gr.Button("Generate Image")
                 image_input = gr.Image(type="filepath", label="Upload Robot Image")
                 prompt_hint = gr.Textbox(label="Prompt hint (optional)", value="")
                 extract_btn = gr.Button("Extract BOM")
@@ -111,6 +124,13 @@ def ui_main():
         state_bom = gr.State({})
         state_macro = gr.State("")
 
+        # Hook text→image generation button to do_generate, updating image_input
+        gen_image_btn.click(
+            do_generate,
+            inputs=[concept_prompt],
+            outputs=image_input,
+        )
+
         def do_extract(image, prompt_hint):
             if not image:
                 return gr.update(visible=False), {}, gr.update(visible=False), gr.update(visible=False)
@@ -120,7 +140,6 @@ def ui_main():
             return gr.update(visible=visible, value=df), bom, gr.update(visible=visible), gr.update(visible=visible)
 
         def do_update_df(df):
-            # Sync DataFrame to BOM dict
             pd = _lazy_import_pandas()
             if not pd or df is None:
                 return {}
@@ -142,19 +161,13 @@ def ui_main():
         skeleton_btn.click(lambda bom: do_skeleton(bom), [state_bom], [macro_download, state_macro])
         assembly_btn.click(lambda bom: do_assembly(bom), [state_bom], [macro_download, state_macro])
 
-        # Feedback button just log for now
         feedback.click(lambda: print("Feedback: thumbs up!"), None, None)
 
     return demo
 
-if __name__ == "__main__":
-    if HAS_GRADIO:
-        utils.ensure_startup_dirs()
-        ui_main().launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)))
-    else:
-        # logger is set up below
-        logger = logging.getLogger("web_ui")
-        logger.warning("Gradio not installed; skipping web UI launch.")
+import argparse
+
+# ... (rest of code remains unchanged above)
 
 from src.cache import cached_get_answers
 from src.prompts import get_parametric_prompt, get_explanation_prompt
@@ -342,3 +355,23 @@ def launch_web_ui():
                 )
 
     demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)))
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Query2CAD Web UI Launcher")
+    parser.add_argument(
+        "--mode",
+        choices=["chat", "pipeline"],
+        default="chat",
+        help="Which UI to launch: 'chat' (default, with Chat tab) or 'pipeline' (Humanoid Robot Pipeline only)."
+    )
+    args = parser.parse_args()
+
+    if HAS_GRADIO:
+        utils.ensure_startup_dirs()
+        if args.mode == "pipeline":
+            ui_main().launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)))
+        else:
+            launch_web_ui()
+    else:
+        logger = logging.getLogger("web_ui")
+        logger.warning("Gradio not installed; skipping web UI launch.")
