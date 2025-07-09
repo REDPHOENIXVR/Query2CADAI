@@ -95,6 +95,29 @@ def df_to_bom(df):
     return group
 
 def ui_main():
+    import gradio as gr
+
+    def do_generate(prompt):
+        if not prompt.strip():
+            return gr.update()
+        from src.image_generator import generate_image
+        path = generate_image(prompt)
+        return gr.update(value=path)
+
+    with gr.Blocks() as demo:
+        gr.Markdown("# Humanoid Robot Pipeline")
+        with gr.Tab("Humanoid Robot Pipeline"):
+            with gr.Row():
+                with gr.Column(scale=1):
+                    concept_prompt = gr.Textbox(label="Concept description", elem_id="concept_prompt")
+                    gen_image_btn = gr.Button("Generate Image", elem_id="gen_image_btn")
+                    image_input = gr.Image(label="Input Image", type="filepath", elem_id="image_input")
+                    gen_image_btn.click(
+                        do_generate,
+                        inputs=[concept_prompt],
+                        outputs=image_input,
+                    )
+                    # ... etc ...
     with gr.Blocks() as demo:
         gr.Markdown("# Query2CAD Humanoid Robot Pipeline")
         with gr.Row():

@@ -30,6 +30,10 @@ This workflow takes you from a robot image to a FreeCAD macro for assembly or sk
    - To launch just the original Humanoid Robot Pipeline UI (without Chat), use:  
      `python -m src.web_ui --mode pipeline`
 
+   **NEW: Text → Image → CAD Flow**
+
+   You can now generate a concept image directly from a text prompt using the “Concept description” box and “Generate Image” button above the image upload. This uses OpenAI's DALL·E (or a compatible model) if available, or produces a placeholder image otherwise (see environment variable `OPENAI_IMAGE_MODEL`). After generating, you may review and proceed to extract the BOM as before.
+
    **Modes:**  
    - `chat` (default): Rich UI with Chat tab and all features.
    - `pipeline`: Only the original Humanoid Robot Pipeline UI (no Chat).
@@ -70,6 +74,14 @@ You can now run the full humanoid pipeline with a single command:
 ```bash
 python -m src.robot_pipeline --image path/to/input.png --outdir results/run1
 ```
+
+Or, to generate an image from a text prompt and use it as input:
+
+```bash
+python -m src.robot_pipeline --text "your concept prompt" --outdir results/run2
+```
+
+If both `--image` and `--text` are supplied, the explicit image is used and `--text` is ignored (with a note). The image is generated using OpenAI (DALL·E by default, override with `OPENAI_IMAGE_MODEL`), or a placeholder if unavailable.
 
 This will:
 - Extract a BOM from the image
