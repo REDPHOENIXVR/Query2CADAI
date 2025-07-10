@@ -99,6 +99,19 @@ Outputs will be in the specified `--outdir`.
 - `src/assembly_builder.py` : Assembly macro builder
 - `src/collision.py`   : STEP collision checker
 
+## Library maintenance
+
+You can now scan your parts library for missing metadata and auto-generate YAML stubs for new or incomplete parts:
+
+```bash
+# Scan for missing metadata and generate stub YAMLs
+python -m src.parts_validator  # or --ai to auto-fill using GPT
+```
+
+- This command will create YAML stubs for any CAD files missing them, and flag any parts lacking essential metadata (like model or category).
+- A report will be printed and written to `library/index/flagged_parts.txt` listing all parts needing review.
+- Optionally, use `--ai` to fill in metadata using OpenAI if `openai` is installed and `OPENAI_API_KEY` is set.
+
 ## Requirements
 
 - Python 3.8+
