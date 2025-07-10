@@ -58,9 +58,15 @@ class PartIndex:
         import yaml
         yml_path = os.path.splitext(path)[0] + ".yml"
         if not os.path.exists(yml_path):
-            minimal = {"name": os.path.basename(path), "tags": [], "description": ""}
+            stub = {
+                "category": "unknown",
+                "model": os.path.splitext(os.path.basename(path))[0],
+                "mass": None,
+                "tags": [],
+                "needs_review": True
+            }
             with open(yml_path, "w") as f:
-                yaml.safe_dump(minimal, f)
+                yaml.safe_dump(stub, f)
 
     def build_index(self, parts_dir=None):
         import os
@@ -146,6 +152,10 @@ class PartIndex:
                 continue
             with open(yml_path, "r") as f:
                 meta = yaml.safe_load(f)
+            # Validation: skip if missing model/category or needs_review
+            if not meta or not meta.get("model") or not meta.get("category") or meta.get("needs_review", True):
+                logging.warning(f"Skipping {pf}: missing model/category or needs_review=true in YAML.")
+                continue
             category = meta.get("category", "")
             model = meta.get("model", "")
             mass = meta.get("mass", 0)
