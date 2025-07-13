@@ -116,3 +116,31 @@ python -m src.parts_validator  # or --ai to auto-fill using GPT
 
 - Python 3.8+
 - pyyaml, sentence-transformers, faiss-cpu, pybullet, pandas, gradio, python-multipart
+
+# Adding the HOPEJr Robot Library
+
+To enrich your Query2CAD part library with a set of high-quality humanoid robot parts, you can import the open-source [HOPEJr](https://github.com/TheRobotStudio/HOPEJr) repository.
+
+## 1. Add the HOPEJr repository as a submodule
+
+```bash
+git submodule add https://github.com/TheRobotStudio/HOPEJr external/HOPEJr
+```
+
+## 2. Import the STEP files into Query2CAD
+
+```bash
+python -m src.import_hopejr
+```
+
+This will copy all STEP files from the HOPEJr repository into `library/parts/` (with a `hopejr_` prefix) and create minimal YAML metadata for each part.
+
+## 3. Rebuild the parts index
+
+```bash
+python -m src.build_parts_index
+```
+
+## 4. Licensing
+
+HOPEJr is licensed under [GPL-3.0](https://github.com/TheRobotStudio/HOPEJr/blob/master/LICENSE). Please review their repository and license before commercial or derivative use.
