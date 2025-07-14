@@ -227,6 +227,41 @@ def launch_web_ui():
     with gr.Blocks() as demo:
         gr.Markdown("# Query2CAD Web Interface")
 
+        # ==== 1. SETTINGS PANEL ====
+        with gr.Accordion(label="⚙ Settings", open=False):
+            openai_key_tb = gr.Textbox(
+                label="OpenAI API Key",
+                value=os.getenv("OPENAI_API_KEY", ""),
+                type="password",
+            )
+            together_key_tb = gr.Textbox(
+                label="Together API Key",
+                value=os.getenv("TOGETHER_API_KEY", ""),
+                type="password",
+            )
+            prompt_max_slider = gr.Slider(
+                minimum=500,
+                maximum=4000,
+                step=100,
+                value=int(os.getenv("OPENAI_IMAGE_PROMPT_MAX_CHARS", 4000)),
+                label="Max Image Prompt Length",
+            )
+            save_settings_btn = gr.Button("Save settings")
+            settings_msg = gr.Markdown(visible=False)
+
+        def save_settings(openai_key, together_key, prompt_max):
+            if openai_key:
+                os.environ["OPENAI_API_KEY"] = openai_key
+            if together_key:
+                os.environ["TOGETHER_API_KEY"] = together_key
+            os.environ["OPENAI_IMAGE_PROMPT_MAX_CHARS"] = str(int(prompt_max))
+            return gr.update(value="✅ Settings saved", visible=True)
+        save_settings_btn.click(
+            save_settings,
+            [openai_key_tb, together_key_tb, prompt_max_slider],
+            [settings_msg],
+        )
+
         # Section 1 – Humanoid Robot Pipeline
         gr.Markdown("## Humanoid Robot Pipeline")
         with gr.Row():
@@ -235,6 +270,57 @@ def launch_web_ui():
                 gen_image_btn = gr.Button("Generate Image")
                 image_input = gr.Image(type="filepath", label="Upload Robot Image")
                 prompt_hint = gr.Textbox(label="Prompt hint (optional)", value="")
+
+                # ==== 2. IMAGE HISTORY GALLERY ====
+                def load_history():
+                    metadata_path = "results/images/metadata.jsonl"
+                    if not os.path.exists(metadata_path):
+                        return []
+                    images = []
+                    with open(metadata_path, "r", encoding="utf-8") as f:
+                        lines = f.readlines()
+                    lines = lines[-20:]  # take last 20
+                    for ln in lines:
+                        try:
+                            meta = json.loads(ln)
+                            path = meta.get("path") or meta.get("filepath") or meta.get("file") or ""
+                            prompt = meta.get("prompt", "")
+                            if path and os.path.exists(path):
+                                images.append([path, prompt])
+                        except Exception:
+                            continue
+                    return images
+
+                def refresh_history():
+                    return load_history()
+
+                refresh_history_btn = gr.Button("🔄 Refresh History")
+                history_gallery = gr.Gallery(
+                    label="Image History",
+                    visible=True,
+                    height=220,
+                    columns=4
+                )
+
+                refresh_history_btn.click(
+                    refresh_history,
+                    inputs=None,
+                    outputs=[history_gallery],
+                )
+
+                def select_history(evt, gallery, image_comp):
+                    idx = getattr(evt, "index", None)
+                    if idx is None or not gallery or idx >= len(gallery):
+                        return gr.update()
+                    path = gallery[idx][0]
+                    return gr.update(value=path)
+
+                history_gallery.select(
+                    select_history,
+                    [history_gallery],
+                    [image_input],
+                )
+
                 extract_btn = gr.Button("Extract BOM")
             with gr.Column():
                 bom_df = gr.Dataframe(
