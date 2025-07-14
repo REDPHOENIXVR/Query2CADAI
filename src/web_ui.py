@@ -292,6 +292,9 @@ def launch_web_ui():
             )
             save_settings_btn = gr.Button("Save settings")
             settings_msg = gr.Markdown(visible=False)
+            # --- Feedback stats UI additions ---
+            feedback_count_md = gr.Markdown("", visible=True)
+            refresh_stats_btn = gr.Button("Refresh Stats")
 
         def save_settings(openai_key, together_key, prompt_max):
             if openai_key:
@@ -305,6 +308,36 @@ def launch_web_ui():
             [openai_key_tb, together_key_tb, prompt_max_slider],
             [settings_msg],
         )
+
+        # --- Feedback stats logic ---
+        def refresh_stats():
+            import sqlite3
+            db_path = "data/learning.db"
+            if not os.path.exists(db_path):
+                return gr.update(value="No feedback DB found.", visible=True)
+            try:
+                conn = sqlite3.connect(db_path)
+                c = conn.cursor()
+                c.execute("SELECT COUNT(*) FROM feedback")
+                count = c.fetchone()[0]
+                c.execute("SELECT COUNT(*) FROM feedback WHERE good=1")
+                good_count = c.fetchone()[0]
+                c.execute("SELECT COUNT(*) FROM feedback WHERE good=0")
+                bad_count = c.fetchone()[0]
+                conn.close()
+                msg = (
+                    f"**Feedback DB:**\n"
+                    f"- Total Feedback: **{count}**\n"
+                    f"- Good: **{good_count}**\n"
+                    f"- Needs Fix: **{bad_count}**"
+                )
+                return gr.update(value=msg, visible=True)
+            except Exception as e:
+                return gr.update(value=f"Error fetching feedback stats: {e}", visible=True)
+
+        refresh_stats_btn.click(refresh_stats, inputs=None, outputs=[feedback_count_md])
+        # Show stats on first load
+        feedback_count_md.value = refresh_stats().value
 
         # Section 1 – Humanoid Robot Pipeline
         gr.Markdown("## Humanoid Robot Pipeline")

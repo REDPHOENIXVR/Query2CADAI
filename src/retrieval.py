@@ -4,6 +4,7 @@ import threading
 import numpy as np
 
 from src.logger import get_logger
+from src.learning_db import log_feedback
 
 logger = get_logger("retrieval")
 
@@ -134,6 +135,7 @@ class Retriever:
                         logger.warning("[retrieval/embedding] Example NOT added to FAISS (no embedding).")
                         self._save()
                         logger.info(f"Example added: status={example['status']} (manifest only)")
+                        log_feedback('macro', query, code, True)
                         return
                 emb_dim = len(embedding)
                 # If index is not built or dimension mismatches, rebuild it with correct dimension
@@ -145,6 +147,8 @@ class Retriever:
                 logger.info(f"[retrieval/embedding] Example embedded and added to FAISS.")
             self._save()
             logger.info(f"Example added: status={example['status']}")
+            # Feedback logging
+            log_feedback('macro', query, code, True)
 
     def ensure_example(self, query, code, status="good", **kwargs):
         """
@@ -167,6 +171,8 @@ class Retriever:
             self.examples.append(example)
             self._save()
             logger.info("Negative example added.")
+            # Feedback logging
+            log_feedback('macro', query, error_msg, False)
 
     def search(self, embedding, k=5):
         """
