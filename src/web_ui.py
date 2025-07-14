@@ -16,6 +16,7 @@ import src.utils as utils
 import os
 import json
 import logging
+import inspect
 from datetime import datetime
 from src.parts_index import PartIndex
 import src.assembly_builder as assembly_builder
@@ -135,6 +136,27 @@ def launch_web_ui():
         logger.warning("Gradio not installed; web UI unavailable.")
         return
 
+    def _create_audio_input():
+        """
+        Helper to instantiate gr.Audio with compatible arguments for Gradio 3.x and 4.x.
+        """
+        params = inspect.signature(gr.Audio).parameters
+        if "source" in params:
+            kwargs = {
+                "source": "microphone",
+                "type": "filepath",
+                "label": "🎤 Record",
+                "scale": 4,
+            }
+        else:
+            kwargs = {
+                "sources": ["microphone"],
+                "type": "filepath",
+                "label": "🎤 Record",
+                "scale": 4,
+            }
+        return gr.Audio(**kwargs)
+
     def infer(query, model, parametric, explain):
         prompt = query
         if parametric:
@@ -242,7 +264,7 @@ def launch_web_ui():
 
         if audio_components_visible:
             with gr.Row():
-                audio_in = gr.Audio(source="microphone", type="filepath", label="🎤 Record", scale=4)
+                audio_in = _create_audio_input()
                 send_audio_btn = gr.Button("Send Audio", scale=1)
             audio_warning_box = gr.Markdown("", visible=False)
         else:
