@@ -2,6 +2,8 @@ import os
 import uuid
 import logging
 import base64
+import time
+import json
 
 def _lazy_import_openai():
     try:
@@ -20,14 +22,30 @@ def generate_image(prompt: str, size: str = "1024x1024", outdir: str = "results/
     openai_api_key = os.environ.get("OPENAI_API_KEY")
     openai_mod = _lazy_import_openai()
     image_model = os.environ.get("OPENAI_IMAGE_MODEL", "dall-e-3")
+    metadata_dir = os.path.join(outdir)
+    metadata_path = os.path.join(metadata_dir, "metadata.jsonl")
     if openai_mod and openai_api_key:
         try:
             import requests
             client = openai_mod.OpenAI(api_key=openai_api_key)
-            logging.info(f"Generating image for prompt: {prompt!r} (model: {image_model}, size: {size})")
+            # Truncate prompt if necessary
+            max_chars = int(os.environ.get("OPENAI_IMAGE_PROMPT_MAX_CHARS", 4000))
+            truncated_prompt = None
+            if len(prompt) > max_chars:
+                logging.info(
+                    f"Prompt length {len(prompt)} exceeds maximum {max_chars}, truncating."
+                )
+                truncated_prompt = prompt[: max_chars - 3] + "..."
+                logging.info(
+                    f"Using truncated prompt of length {len(truncated_prompt)} for image generation."
+                )
+
+            prompt_to_use = truncated_prompt if truncated_prompt is not None else prompt
+
+            logging.info(f"Generating image for prompt: {prompt_to_use!r} (model: {image_model}, size: {size})")
             response = client.images.generate(
                 model=image_model,
-                prompt=prompt,
+                prompt=prompt_to_use,
                 n=1,
                 size=size,
                 response_format="url"
@@ -39,6 +57,16 @@ def generate_image(prompt: str, size: str = "1024x1024", outdir: str = "results/
             with open(outpath, "wb") as f:
                 f.write(img_data)
             logging.info(f"Image generated and saved to: {outpath}")
+            # --- Write metadata ---
+            os.makedirs(metadata_dir, exist_ok=True)
+            meta = {
+                "timestamp": int(time.time()),
+                "prompt": prompt,
+                "prompt_used": prompt_to_use,
+                "path": outpath
+            }
+            with open(metadata_path, "a", encoding="utf-8") as mf:
+                mf.write(json.dumps(meta) + "\n")
             return outpath
         except Exception as e:
             logging.warning(f"OpenAI image generation failed, using placeholder. Reason: {e}")
@@ -51,6 +79,13 @@ def generate_image(prompt: str, size: str = "1024x1024", outdir: str = "results/
     except ImportError:
         raise RuntimeError("Pillow is required for placeholder image generation")
 
+    # Use the possibly truncated prompt for the placeholder image text, too
+    max_chars = int(os.environ.get("OPENAI_IMAGE_PROMPT_MAX_CHARS", 4000))
+    truncated_prompt = None
+    if len(prompt) > max_chars:
+        truncated_prompt = prompt[: max_chars - 3] + "..."
+    prompt_to_use = truncated_prompt if truncated_prompt is not None else prompt
+
     img = Image.new("RGB", (512, 512), (180, 180, 180))
     draw = ImageDraw.Draw(img)
     font = None
@@ -58,7 +93,7 @@ def generate_image(prompt: str, size: str = "1024x1024", outdir: str = "results/
         font = ImageFont.truetype("arial.ttf", 20)
     except Exception:
         font = ImageFont.load_default()
-    text = prompt.strip() or "(no prompt)"
+    text = prompt_to_use.strip() or "(no prompt)"
     lines = []
     max_width = 480
     # Simple word wrap
@@ -77,4 +112,14 @@ def generate_image(prompt: str, size: str = "1024x1024", outdir: str = "results/
     outpath = os.path.join(outdir, placeholder_fname)
     img.save(outpath, "PNG")
     logging.info(f"Placeholder image saved to: {outpath}")
+    # --- Write metadata ---
+    os.makedirs(metadata_dir, exist_ok=True)
+    meta = {
+        "timestamp": int(time.time()),
+        "prompt": prompt,
+        "prompt_used": prompt_to_use,
+        "path": outpath
+    }
+    with open(metadata_path, "a", encoding="utf-8") as mf:
+        mf.write(json.dumps(meta) + "\n")
     return outpath

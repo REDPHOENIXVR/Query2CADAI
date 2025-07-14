@@ -37,6 +37,7 @@ class PartMeta:
     mass: Optional[float]
     tags: List[str]
     filename: str
+    thumbnail: Optional[str] = None  # Path to PNG thumbnail if available
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -114,13 +115,21 @@ class PartIndex:
                 if not isinstance(tags, list):
                     tags = [tags]
                 part_id = os.path.splitext(os.path.basename(pf))[0]
+                # Find thumbnail path
+                thumbnails_dir = "library/thumbnails"
+                thumb_path = os.path.join(thumbnails_dir, f"{part_id}.png")
+                if os.path.isfile(thumb_path):
+                    thumbnail = thumb_path
+                else:
+                    thumbnail = None
                 part = PartMeta(
                     id=part_id,
                     category=category,
                     model=model,
                     mass=mass,
                     tags=tags,
-                    filename=pf
+                    filename=pf,
+                    thumbnail=thumbnail
                 )
                 parts.append(part)
                 id_to_path[part_id] = pf

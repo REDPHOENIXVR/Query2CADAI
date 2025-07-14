@@ -38,11 +38,22 @@ def main():
     os.makedirs(args.outdir, exist_ok=True)
 
     # 1. BOM
-    bom = extract_bom(image_path)
+    bom_result = extract_bom(image_path)
+    if isinstance(bom_result, tuple) and len(bom_result) == 2:
+        bom, warnings = bom_result
+    else:
+        bom, warnings = bom_result, []
     bom_path = os.path.join(args.outdir, "bom.json")
     with open(bom_path, "w") as f:
         json.dump(bom, f, indent=2)
     print(f"BOM saved to {bom_path}")
+    # Save warnings if any
+    if warnings:
+        warnings_path = os.path.join(args.outdir, "bom_warnings.txt")
+        with open(warnings_path, "w") as wf:
+            for w in warnings:
+                wf.write(w + "\n")
+        print(f"BOM warnings saved to {warnings_path}")
 
     # 2. Skeleton macro
     sk_code = generate_skeleton(bom)

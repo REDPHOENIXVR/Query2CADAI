@@ -55,11 +55,14 @@ def load_image(image_input):
         from PIL import Image
         return Image.new("RGB", (128, 128), color="gray")
 
+from src.bom_utils import validate_bom
+
 def extract_bom(image_bytes_or_path, prompt_hint=""):
     """
     Given an image (file path or bytes), calls OpenAI Vision endpoint (if API key and openai>=1.0 installed)
     to extract a Bill of Materials (BOM) as JSON. Falls back to current dummy BOM on failure.
     Image is resized to max 1024x1024 before sending.
+    Returns: (corrected_bom, warnings)
     """
     import io
 
@@ -233,9 +236,19 @@ def extract_bom(image_bytes_or_path, prompt_hint=""):
     # Validate keys
     if not (isinstance(bom, dict) and "head" in bom and "torso" in bom and "legs" in bom and isinstance(bom["legs"], list)):
         raise ValueError("BOM must contain at least head, torso, legs (list)")
+
+    # === BOM VALIDATION & WARNING LOGIC ===
+    corrected_bom, warnings = validate_bom(bom)
+
     ts = int(time.time())
     os.makedirs("results/bom", exist_ok=True)
     outpath = f"results/bom/{ts}.json"
     with open(outpath, "w") as f:
-        json.dump(bom, f, indent=2)
-    return bom
+        json.dump(corrected_bom, f, indent=2)
+    # Save warnings to a dedicated file if any
+    if warnings:
+        warn_path = f"results/bom/{ts}_warnings.txt"
+        with open(warn_path, "w") as wf:
+            for w in warnings:
+                wf.write(w + "\n")
+    return corrected_bom, warnings

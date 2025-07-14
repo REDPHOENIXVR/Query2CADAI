@@ -15,8 +15,10 @@ except ImportError:
 import src.utils as utils
 import os
 import json
+import time
 import logging
 import inspect
+import math
 from datetime import datetime
 from src.parts_index import PartIndex
 import src.assembly_builder as assembly_builder
@@ -33,6 +35,45 @@ def _lazy_import():
     import importlib
     return importlib
 
+def estimate_weight(bom):
+    """
+    Estimate the total weight (in grams) of the BOM by querying the parts index or using defaults.
+    """
+    total_grams = 0
+    weight_map = {'sphere': 1000, 'box': 3000, 'cylinder': 1500}
+
+    def get_mass_for_component(comp):
+        if not comp or not isinstance(comp, dict):
+            return 0
+        # Compose a descriptive query string for the part
+        comp_type = comp.get('type', '')
+        comp_material = comp.get('material', '')
+        comp_tags = comp.get('tags', '')
+        text = f"{comp_type} {comp_material} {comp_tags}".strip()
+        result = pi_global.query(text, k=1)
+        if result and getattr(result[0], 'mass', None) is not None:
+            try:
+                return float(result[0].mass)
+            except Exception:
+                pass
+        # Fallback to primitive type weight
+        base = weight_map.get(comp_type.lower(), 1000)
+        # Optionally, could scale by size, but for now use constant
+        return base
+
+    # Single components
+    for key in ["head", "torso"]:
+        comp = bom.get(key, {})
+        total_grams += get_mass_for_component(comp)
+    # Components list: legs, arms
+    for key in ["legs", "arms"]:
+        comps = bom.get(key, [])
+        if isinstance(comps, dict):  # Defensive: sometimes malformed
+            comps = [comps]
+        for comp in comps:
+            total_grams += get_mass_for_component(comp)
+    return total_grams
+
 # Set up global PartIndex cache
 pi_global = PartIndex.load()
 if pi_global.index is None or len(pi_global.parts) == 0:
@@ -43,9 +84,9 @@ def get_bom_from_image(image_bytes, prompt_hint=""):
     import src.vision_bom as vision_bom
     return vision_bom.extract_bom(image_bytes, prompt_hint)
 
-def get_skeleton_macro(bom):
+def get_skeleton_macro(bom, param=None):
     import src.skeleton as skeleton
-    return skeleton.generate_skeleton(bom, None)
+    return skeleton.generate_skeleton(bom, param)
 
 def get_assembly_macro(bom):
     return assembly_builder.build_assembly(bom, pi_global)
@@ -91,20 +132,49 @@ def df_to_bom(df):
             group["arms"].append(d)
     return group
 
+def update_info(msg):
+    return gr.update(value=msg)
+
 def do_generate(prompt):
     if not prompt.strip():
-        return gr.update()
+        return gr.update(), update_info("No prompt provided.")
     from src.image_generator import generate_image
-    path = generate_image(prompt)
-    return gr.update(value=path)
+    info_update = update_info("Generating image…")
+    with gr.Progress(track_tqdm=False) as progress:
+        path = generate_image(prompt)
+    info_update = update_info(f"Image generated: {path}")
+    return gr.update(value=path), info_update
 
 def do_extract(image, prompt_hint):
     if not image:
-        return gr.update(visible=False), {}, gr.update(visible=False), gr.update(visible=False)
-    bom = get_bom_from_image(image, prompt_hint)
+        return gr.update(visible=False), {}, gr.update(visible=False), gr.update(visible=False), update_info("No image provided.")
+    info_update = update_info("Extracting BOM …")
+    # Unpack: corrected_bom, warnings
+    with gr.Progress(track_tqdm=False) as progress:
+        result = get_bom_from_image(image, prompt_hint)
+    if isinstance(result, tuple) and len(result) == 2:
+        bom, warnings = result
+    else:
+        bom, warnings = result, []
+
     df = load_bom_to_df(bom)
     visible = True if df is not None else False
-    return gr.update(visible=visible, value=df), bom, gr.update(visible=visible), gr.update(visible=visible)
+    # Placeholder detection logic
+    placeholder = False
+    if "head" in bom and "torso" in bom:
+        if bom['head'].get('type') == 'sphere' and bom['torso'].get('type') == 'box':
+            placeholder = True
+    if placeholder:
+        info_update = update_info("⚠️ Used placeholder BOM (vision failed)")
+    else:
+        info_msg = "BOM extracted successfully"
+        if warnings:
+            info_msg += "\nWarnings:\n" + "\n".join(warnings)
+        # --- Add estimated weight ---
+        wt = estimate_weight(bom)
+        info_msg += f"\nEstimated mass: {wt/1000:.2f} kg"
+        info_update = update_info(info_msg)
+    return gr.update(visible=visible, value=df), bom, gr.update(visible=visible), gr.update(visible=visible), info_update
 
 def do_update_df(df):
     pd = _lazy_import_pandas()
@@ -113,8 +183,9 @@ def do_update_df(df):
     bom = df_to_bom(pd.DataFrame(df))
     return bom
 
-def do_skeleton(bom):
-    macro = get_skeleton_macro(bom)
+def do_skeleton(bom, h, leg, arm):
+    param = {"height": h, "leg_length": leg, "arm_length": arm}
+    macro = get_skeleton_macro(bom, param)
     path = save_macro_file(macro, "skeleton.FCMacro")
     return gr.update(value=path, visible=True), macro
 
@@ -157,6 +228,19 @@ def launch_web_ui():
             }
         return gr.Audio(**kwargs)
 
+    def _create_chatbot():
+        """
+        Helper to instantiate gr.Chatbot with compatible arguments for Gradio 3.x and 4.x,
+        avoiding deprecation warnings for the 'label' and 'type' parameters.
+        """
+        params = inspect.signature(gr.Chatbot).parameters
+        if "type" in params:
+            # Gradio 4.x expects the 'type' parameter
+            return gr.Chatbot(label="Query2CAD Conversation", type="tuples")  # Explicitly set type to suppress deprecation warning
+        else:
+            # Gradio 3.x does not accept 'type'
+            return gr.Chatbot(label="Query2CAD Conversation")
+
     def infer(query, model, parametric, explain):
         prompt = query
         if parametric:
@@ -187,6 +271,74 @@ def launch_web_ui():
     with gr.Blocks() as demo:
         gr.Markdown("# Query2CAD Web Interface")
 
+        # ==== 1. SETTINGS PANEL ====
+        with gr.Accordion(label="⚙ Settings", open=False):
+            openai_key_tb = gr.Textbox(
+                label="OpenAI API Key",
+                value=os.getenv("OPENAI_API_KEY", ""),
+                type="password",
+            )
+            together_key_tb = gr.Textbox(
+                label="Together API Key",
+                value=os.getenv("TOGETHER_API_KEY", ""),
+                type="password",
+            )
+            prompt_max_slider = gr.Slider(
+                minimum=500,
+                maximum=4000,
+                step=100,
+                value=int(os.getenv("OPENAI_IMAGE_PROMPT_MAX_CHARS", 4000)),
+                label="Max Image Prompt Length",
+            )
+            save_settings_btn = gr.Button("Save settings")
+            settings_msg = gr.Markdown(visible=False)
+            # --- Feedback stats UI additions ---
+            feedback_count_md = gr.Markdown("", visible=True)
+            refresh_stats_btn = gr.Button("Refresh Stats")
+
+        def save_settings(openai_key, together_key, prompt_max):
+            if openai_key:
+                os.environ["OPENAI_API_KEY"] = openai_key
+            if together_key:
+                os.environ["TOGETHER_API_KEY"] = together_key
+            os.environ["OPENAI_IMAGE_PROMPT_MAX_CHARS"] = str(int(prompt_max))
+            return gr.update(value="✅ Settings saved", visible=True)
+        save_settings_btn.click(
+            save_settings,
+            [openai_key_tb, together_key_tb, prompt_max_slider],
+            [settings_msg],
+        )
+
+        # --- Feedback stats logic ---
+        def refresh_stats():
+            import sqlite3
+            db_path = "data/learning.db"
+            if not os.path.exists(db_path):
+                return gr.update(value="No feedback DB found.", visible=True)
+            try:
+                conn = sqlite3.connect(db_path)
+                c = conn.cursor()
+                c.execute("SELECT COUNT(*) FROM feedback")
+                count = c.fetchone()[0]
+                c.execute("SELECT COUNT(*) FROM feedback WHERE good=1")
+                good_count = c.fetchone()[0]
+                c.execute("SELECT COUNT(*) FROM feedback WHERE good=0")
+                bad_count = c.fetchone()[0]
+                conn.close()
+                msg = (
+                    f"**Feedback DB:**\n"
+                    f"- Total Feedback: **{count}**\n"
+                    f"- Good: **{good_count}**\n"
+                    f"- Needs Fix: **{bad_count}**"
+                )
+                return gr.update(value=msg, visible=True)
+            except Exception as e:
+                return gr.update(value=f"Error fetching feedback stats: {e}", visible=True)
+
+        refresh_stats_btn.click(refresh_stats, inputs=None, outputs=[feedback_count_md])
+        # Show stats on first load
+        feedback_count_md.value = refresh_stats().value
+
         # Section 1 – Humanoid Robot Pipeline
         gr.Markdown("## Humanoid Robot Pipeline")
         with gr.Row():
@@ -195,13 +347,76 @@ def launch_web_ui():
                 gen_image_btn = gr.Button("Generate Image")
                 image_input = gr.Image(type="filepath", label="Upload Robot Image")
                 prompt_hint = gr.Textbox(label="Prompt hint (optional)", value="")
+
+                # ==== 2. IMAGE HISTORY GALLERY ====
+                def load_history():
+                    metadata_path = "results/images/metadata.jsonl"
+                    if not os.path.exists(metadata_path):
+                        return []
+                    images = []
+                    with open(metadata_path, "r", encoding="utf-8") as f:
+                        lines = f.readlines()
+                    lines = lines[-20:]  # take last 20
+                    for ln in lines:
+                        try:
+                            meta = json.loads(ln)
+                            path = meta.get("path") or meta.get("filepath") or meta.get("file") or ""
+                            prompt = meta.get("prompt", "")
+                            if path and os.path.exists(path):
+                                images.append([path, prompt])
+                        except Exception:
+                            continue
+                    return images
+
+                def refresh_history():
+                    return load_history()
+
+                refresh_history_btn = gr.Button("🔄 Refresh History")
+                history_gallery = gr.Gallery(
+                    label="Image History",
+                    visible=True,
+                    height=220,
+                    columns=4
+                )
+
+                refresh_history_btn.click(
+                    refresh_history,
+                    inputs=None,
+                    outputs=[history_gallery],
+                )
+
+                def select_history(evt, gallery, image_comp):
+                    idx = getattr(evt, "index", None)
+                    if idx is None or not gallery or idx >= len(gallery):
+                        return gr.update()
+                    path = gallery[idx][0]
+                    return gr.update(value=path)
+
+                history_gallery.select(
+                    select_history,
+                    [history_gallery],
+                    [image_input],
+                )
+
                 extract_btn = gr.Button("Extract BOM")
             with gr.Column():
-                bom_df = gr.Dataframe(label="Editable BOM", interactive=True, visible=False)
+                bom_df = gr.Dataframe(
+                    label="Editable BOM",
+                    headers=["type", "material", "component", "side"],
+                    column_config={
+                        "side": gr.ColumnDropdown(choices=["left", "right", "center", ""])
+                    },
+                    interactive=True,
+                    visible=False
+                )
+                height_slider = gr.Slider(100, 250, value=180, label="Height (cm)")
+                leg_slider = gr.Slider(30, 120, value=70, label="Leg length (cm)")
+                arm_slider = gr.Slider(20, 100, value=60, label="Arm length (cm)")
                 skeleton_btn = gr.Button("Generate skeleton", visible=False)
                 assembly_btn = gr.Button("Build assembly", visible=False)
                 macro_download = gr.File(label="Download Macro", visible=False)
                 feedback = gr.Button("👍", visible=True)
+        info_box = gr.Markdown("Status", label="Status", visible=True)
         state_bom = gr.State({})
         state_macro = gr.State("")
 
@@ -209,11 +424,19 @@ def launch_web_ui():
         gen_image_btn.click(
             do_generate,
             inputs=[concept_prompt],
-            outputs=image_input,
+            outputs=[image_input, info_box],
         )
-        extract_btn.click(do_extract, [image_input, prompt_hint], [bom_df, state_bom, skeleton_btn, assembly_btn])
+        extract_btn.click(
+            do_extract,
+            [image_input, prompt_hint],
+            [bom_df, state_bom, skeleton_btn, assembly_btn, info_box]
+        )
         bom_df.change(do_update_df, [bom_df], [state_bom])
-        skeleton_btn.click(lambda bom: do_skeleton(bom), [state_bom], [macro_download, state_macro])
+        skeleton_btn.click(
+            do_skeleton,
+            [state_bom, height_slider, leg_slider, arm_slider],
+            [macro_download, state_macro]
+        )
         assembly_btn.click(lambda bom: do_assembly(bom), [state_bom], [macro_download, state_macro])
         feedback.click(lambda: print("Feedback: thumbs up!"), None, None)
 
@@ -253,7 +476,7 @@ def launch_web_ui():
         # Section 3 – Chat with Query2CAD AI
         gr.Markdown("## Chat with Query2CAD AI")
         chat_model = gr.Radio(MODEL_OPTIONS, value=MODEL_OPTIONS[0], label="Model")
-        chatbot = gr.Chatbot(label="Query2CAD Conversation")
+        chatbot = _create_chatbot()
         chat_state = gr.State([])
 
         audio_components_visible = HAS_OPENAI
@@ -295,12 +518,16 @@ def launch_web_ui():
             if not api_key:
                 return gr.update(), chat_state, gr.update(value="⚠️ Please set your OPENAI_API_KEY environment variable to enable audio transcription.", visible=True)
             try:
+                # Set API key globally for openai>=1.12.0+
+                openai.api_key = api_key
                 with open(audio_filepath, "rb") as f:
-                    transcript = openai.audio.transcriptions.transcribe("whisper-1", f, api_key=api_key)
-                if isinstance(transcript, dict):
+                    transcript = openai.audio.transcriptions.create(model="whisper-1", file=f)
+                # Prefer transcript.text, fallback to dict["text"] if necessary
+                text = getattr(transcript, "text", None)
+                if text is None and isinstance(transcript, dict):
                     text = transcript.get("text", "")
-                else:
-                    text = transcript
+                if text is None:
+                    text = ""
                 if not text.strip():
                     return gr.update(), chat_state, gr.update(value="⚠️ No transcription result.", visible=True)
             except Exception as e:
@@ -347,6 +574,69 @@ def launch_web_ui():
             inputs=[chat_state],
             outputs=[export_file],
         )
+
+        # ==== Section 4 - Parts Browser Gallery ====
+        gr.Markdown("## Parts Library")
+
+        import glob
+
+        def load_parts_gallery():
+            thumbnails_dir = "library/thumbnails"
+            if not os.path.exists(thumbnails_dir):
+                return []
+            png_files = sorted(glob.glob(os.path.join(thumbnails_dir, "*.png")))
+            gallery = []
+            for path in png_files:
+                basename = os.path.basename(path)
+                part_id = basename.rsplit('.', 1)[0]
+                gallery.append([path, part_id])
+            return gallery
+
+        def refresh_parts():
+            return load_parts_gallery()
+
+        part_info = gr.Markdown(visible=False)
+        refresh_parts_btn = gr.Button("🔄 Refresh Parts")
+        parts_gallery = gr.Gallery(label="Parts", visible=True, height=300, columns=6)
+
+        def select_part(evt, gallery):
+            idx = getattr(evt, "index", None)
+            if idx is None or not gallery or idx >= len(gallery):
+                return gr.update(visible=False)
+            part_id = gallery[idx][1]
+            # Lookup meta from pi_global.id_to_path
+            pi = pi_global
+            manifest_md = ""
+            part_path = pi.id_to_path.get(part_id)
+            if part_path and os.path.exists(part_path):
+                try:
+                    with open(part_path, "r", encoding="utf-8") as f:
+                        manifest = json.load(f)
+                    # Gather details to show
+                    lines = [f"**ID:** `{part_id}`"]
+                    for k in ["model", "category", "mass", "material"]:
+                        v = manifest.get(k)
+                        if v is not None:
+                            lines.append(f"**{k.capitalize()}:** {v}")
+                    # Add any other metadata fields
+                    for k, v in manifest.items():
+                        if k in ["model", "category", "mass", "material"]:
+                            continue
+                        if isinstance(v, (str, int, float)):
+                            lines.append(f"**{k.capitalize()}:** {v}")
+                    manifest_md = "\n".join(lines)
+                except Exception as e:
+                    manifest_md = f"Could not read manifest for `{part_id}`.<br>Error: {e}"
+            else:
+                manifest_md = f"Part `{part_id}` not found in index."
+            return gr.update(value=manifest_md, visible=True)
+
+        # Bind events
+        refresh_parts_btn.click(refresh_parts, None, [parts_gallery])
+        parts_gallery.select(select_part, [parts_gallery], [part_info])
+
+        # Pre-populate on startup
+        parts_gallery.value = load_parts_gallery()
 
     demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)))
 
