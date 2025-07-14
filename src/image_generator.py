@@ -24,10 +24,24 @@ def generate_image(prompt: str, size: str = "1024x1024", outdir: str = "results/
         try:
             import requests
             client = openai_mod.OpenAI(api_key=openai_api_key)
-            logging.info(f"Generating image for prompt: {prompt!r} (model: {image_model}, size: {size})")
+            # Truncate prompt if necessary
+            max_chars = int(os.environ.get("OPENAI_IMAGE_PROMPT_MAX_CHARS", 4000))
+            truncated_prompt = None
+            if len(prompt) > max_chars:
+                logging.info(
+                    f"Prompt length {len(prompt)} exceeds maximum {max_chars}, truncating."
+                )
+                truncated_prompt = prompt[: max_chars - 3] + "..."
+                logging.info(
+                    f"Using truncated prompt of length {len(truncated_prompt)} for image generation."
+                )
+
+            prompt_to_use = truncated_prompt if truncated_prompt is not None else prompt
+
+            logging.info(f"Generating image for prompt: {prompt_to_use!r} (model: {image_model}, size: {size})")
             response = client.images.generate(
                 model=image_model,
-                prompt=prompt,
+                prompt=prompt_to_use,
                 n=1,
                 size=size,
                 response_format="url"
