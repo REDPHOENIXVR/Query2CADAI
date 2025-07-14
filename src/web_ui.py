@@ -15,6 +15,7 @@ except ImportError:
 import src.utils as utils
 import os
 import json
+import time
 import logging
 import inspect
 from datetime import datetime
@@ -91,20 +92,35 @@ def df_to_bom(df):
             group["arms"].append(d)
     return group
 
+def update_info(msg):
+    return gr.update(value=msg)
+
 def do_generate(prompt):
     if not prompt.strip():
-        return gr.update()
+        return gr.update(), update_info("No prompt provided.")
     from src.image_generator import generate_image
+    info_update = update_info("Generating image…")
     path = generate_image(prompt)
-    return gr.update(value=path)
+    info_update = update_info(f"Image generated: {path}")
+    return gr.update(value=path), info_update
 
 def do_extract(image, prompt_hint):
     if not image:
-        return gr.update(visible=False), {}, gr.update(visible=False), gr.update(visible=False)
+        return gr.update(visible=False), {}, gr.update(visible=False), gr.update(visible=False), update_info("No image provided.")
+    info_update = update_info("Extracting BOM …")
     bom = get_bom_from_image(image, prompt_hint)
     df = load_bom_to_df(bom)
     visible = True if df is not None else False
-    return gr.update(visible=visible, value=df), bom, gr.update(visible=visible), gr.update(visible=visible)
+    # Placeholder detection logic
+    placeholder = False
+    if "head" in bom and "torso" in bom:
+        if bom['head'].get('type') == 'sphere' and bom['torso'].get('type') == 'box':
+            placeholder = True
+    if placeholder:
+        info_update = update_info("⚠️ Used placeholder BOM (vision failed)")
+    else:
+        info_update = update_info("BOM extracted successfully")
+    return gr.update(visible=visible, value=df), bom, gr.update(visible=visible), gr.update(visible=visible), info_update
 
 def do_update_df(df):
     pd = _lazy_import_pandas()
@@ -215,6 +231,7 @@ def launch_web_ui():
                 assembly_btn = gr.Button("Build assembly", visible=False)
                 macro_download = gr.File(label="Download Macro", visible=False)
                 feedback = gr.Button("👍", visible=True)
+        info_box = gr.Markdown("Status", label="Status", visible=True)
         state_bom = gr.State({})
         state_macro = gr.State("")
 
@@ -222,9 +239,13 @@ def launch_web_ui():
         gen_image_btn.click(
             do_generate,
             inputs=[concept_prompt],
-            outputs=image_input,
+            outputs=[image_input, info_box],
         )
-        extract_btn.click(do_extract, [image_input, prompt_hint], [bom_df, state_bom, skeleton_btn, assembly_btn])
+        extract_btn.click(
+            do_extract,
+            [image_input, prompt_hint],
+            [bom_df, state_bom, skeleton_btn, assembly_btn, info_box]
+        )
         bom_df.change(do_update_df, [bom_df], [state_bom])
         skeleton_btn.click(lambda bom: do_skeleton(bom), [state_bom], [macro_download, state_macro])
         assembly_btn.click(lambda bom: do_assembly(bom), [state_bom], [macro_download, state_macro])

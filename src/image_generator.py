@@ -2,6 +2,8 @@ import os
 import uuid
 import logging
 import base64
+import time
+import json
 
 def _lazy_import_openai():
     try:
@@ -20,6 +22,8 @@ def generate_image(prompt: str, size: str = "1024x1024", outdir: str = "results/
     openai_api_key = os.environ.get("OPENAI_API_KEY")
     openai_mod = _lazy_import_openai()
     image_model = os.environ.get("OPENAI_IMAGE_MODEL", "dall-e-3")
+    metadata_dir = os.path.join(outdir)
+    metadata_path = os.path.join(metadata_dir, "metadata.jsonl")
     if openai_mod and openai_api_key:
         try:
             import requests
@@ -53,6 +57,16 @@ def generate_image(prompt: str, size: str = "1024x1024", outdir: str = "results/
             with open(outpath, "wb") as f:
                 f.write(img_data)
             logging.info(f"Image generated and saved to: {outpath}")
+            # --- Write metadata ---
+            os.makedirs(metadata_dir, exist_ok=True)
+            meta = {
+                "timestamp": int(time.time()),
+                "prompt": prompt,
+                "prompt_used": prompt_to_use,
+                "path": outpath
+            }
+            with open(metadata_path, "a", encoding="utf-8") as mf:
+                mf.write(json.dumps(meta) + "\n")
             return outpath
         except Exception as e:
             logging.warning(f"OpenAI image generation failed, using placeholder. Reason: {e}")
@@ -98,4 +112,14 @@ def generate_image(prompt: str, size: str = "1024x1024", outdir: str = "results/
     outpath = os.path.join(outdir, placeholder_fname)
     img.save(outpath, "PNG")
     logging.info(f"Placeholder image saved to: {outpath}")
+    # --- Write metadata ---
+    os.makedirs(metadata_dir, exist_ok=True)
+    meta = {
+        "timestamp": int(time.time()),
+        "prompt": prompt,
+        "prompt_used": prompt_to_use,
+        "path": outpath
+    }
+    with open(metadata_path, "a", encoding="utf-8") as mf:
+        mf.write(json.dumps(meta) + "\n")
     return outpath
