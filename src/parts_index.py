@@ -66,7 +66,16 @@ class PartIndex:
             with open(yml_path, "w") as f:
                 yaml.safe_dump(stub, f)
 
-    def build_index(self) -> None:
+    def build_index(self, parts_dir: Optional[str] = None) -> None:
+        """
+        Build the index for the current parts directory.
+
+        Args:
+            parts_dir (Optional[str]): If provided and different from self.parts_dir, sets self.parts_dir.
+        """
+        if parts_dir is not None and parts_dir != self.parts_dir:
+            self.parts_dir = parts_dir
+
         yaml = _lazy_import_yaml()
         SentenceTransformer = _lazy_import_sentence_transformer()
         faiss = _lazy_import_faiss()

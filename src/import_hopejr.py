@@ -74,7 +74,7 @@ def main():
     if args.run_index:
         try:
             from src.parts_index import PartIndex
-            PartIndex().build_index(library_dir=args.dest)
+            PartIndex().build_index(parts_dir=args.dest)
             indexed = True
         except Exception as e:
             print("Indexing failed:", e)

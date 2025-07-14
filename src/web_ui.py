@@ -35,7 +35,7 @@ def _lazy_import():
 # Set up global PartIndex cache
 pi_global = PartIndex.load()
 if pi_global.index is None or len(pi_global.parts) == 0:
-    pi_global.build_index("library/parts")
+    pi_global.build_index()
 
 # New: Import robot pipeline modules lazily
 def get_bom_from_image(image_bytes, prompt_hint=""):
