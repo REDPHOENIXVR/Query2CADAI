@@ -542,6 +542,69 @@ def launch_web_ui():
             outputs=[export_file],
         )
 
+        # ==== Section 4 - Parts Browser Gallery ====
+        gr.Markdown("## Parts Library")
+
+        import glob
+
+        def load_parts_gallery():
+            thumbnails_dir = "library/thumbnails"
+            if not os.path.exists(thumbnails_dir):
+                return []
+            png_files = sorted(glob.glob(os.path.join(thumbnails_dir, "*.png")))
+            gallery = []
+            for path in png_files:
+                basename = os.path.basename(path)
+                part_id = basename.rsplit('.', 1)[0]
+                gallery.append([path, part_id])
+            return gallery
+
+        def refresh_parts():
+            return load_parts_gallery()
+
+        part_info = gr.Markdown(visible=False)
+        refresh_parts_btn = gr.Button("🔄 Refresh Parts")
+        parts_gallery = gr.Gallery(label="Parts", visible=True, height=300, columns=6)
+
+        def select_part(evt, gallery):
+            idx = getattr(evt, "index", None)
+            if idx is None or not gallery or idx >= len(gallery):
+                return gr.update(visible=False)
+            part_id = gallery[idx][1]
+            # Lookup meta from pi_global.id_to_path
+            pi = pi_global
+            manifest_md = ""
+            part_path = pi.id_to_path.get(part_id)
+            if part_path and os.path.exists(part_path):
+                try:
+                    with open(part_path, "r", encoding="utf-8") as f:
+                        manifest = json.load(f)
+                    # Gather details to show
+                    lines = [f"**ID:** `{part_id}`"]
+                    for k in ["model", "category", "mass", "material"]:
+                        v = manifest.get(k)
+                        if v is not None:
+                            lines.append(f"**{k.capitalize()}:** {v}")
+                    # Add any other metadata fields
+                    for k, v in manifest.items():
+                        if k in ["model", "category", "mass", "material"]:
+                            continue
+                        if isinstance(v, (str, int, float)):
+                            lines.append(f"**{k.capitalize()}:** {v}")
+                    manifest_md = "\n".join(lines)
+                except Exception as e:
+                    manifest_md = f"Could not read manifest for `{part_id}`.<br>Error: {e}"
+            else:
+                manifest_md = f"Part `{part_id}` not found in index."
+            return gr.update(value=manifest_md, visible=True)
+
+        # Bind events
+        refresh_parts_btn.click(refresh_parts, None, [parts_gallery])
+        parts_gallery.select(select_part, [parts_gallery], [part_info])
+
+        # Pre-populate on startup
+        parts_gallery.value = load_parts_gallery()
+
     demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)))
 
 if __name__ == "__main__":
