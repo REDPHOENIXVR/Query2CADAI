@@ -18,6 +18,7 @@ import json
 import time
 import logging
 import inspect
+import math
 from datetime import datetime
 from src.parts_index import PartIndex
 import src.assembly_builder as assembly_builder
@@ -33,6 +34,45 @@ def _lazy_import_pandas():
 def _lazy_import():
     import importlib
     return importlib
+
+def estimate_weight(bom):
+    """
+    Estimate the total weight (in grams) of the BOM by querying the parts index or using defaults.
+    """
+    total_grams = 0
+    weight_map = {'sphere': 1000, 'box': 3000, 'cylinder': 1500}
+
+    def get_mass_for_component(comp):
+        if not comp or not isinstance(comp, dict):
+            return 0
+        # Compose a descriptive query string for the part
+        comp_type = comp.get('type', '')
+        comp_material = comp.get('material', '')
+        comp_tags = comp.get('tags', '')
+        text = f"{comp_type} {comp_material} {comp_tags}".strip()
+        result = pi_global.query(text, k=1)
+        if result and getattr(result[0], 'mass', None) is not None:
+            try:
+                return float(result[0].mass)
+            except Exception:
+                pass
+        # Fallback to primitive type weight
+        base = weight_map.get(comp_type.lower(), 1000)
+        # Optionally, could scale by size, but for now use constant
+        return base
+
+    # Single components
+    for key in ["head", "torso"]:
+        comp = bom.get(key, {})
+        total_grams += get_mass_for_component(comp)
+    # Components list: legs, arms
+    for key in ["legs", "arms"]:
+        comps = bom.get(key, [])
+        if isinstance(comps, dict):  # Defensive: sometimes malformed
+            comps = [comps]
+        for comp in comps:
+            total_grams += get_mass_for_component(comp)
+    return total_grams
 
 # Set up global PartIndex cache
 pi_global = PartIndex.load()
@@ -130,6 +170,9 @@ def do_extract(image, prompt_hint):
         info_msg = "BOM extracted successfully"
         if warnings:
             info_msg += "\nWarnings:\n" + "\n".join(warnings)
+        # --- Add estimated weight ---
+        wt = estimate_weight(bom)
+        info_msg += f"\nEstimated mass: {wt/1000:.2f} kg"
         info_update = update_info(info_msg)
     return gr.update(visible=visible, value=df), bom, gr.update(visible=visible), gr.update(visible=visible), info_update
 
