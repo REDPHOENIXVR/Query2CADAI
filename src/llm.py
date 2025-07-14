@@ -14,15 +14,25 @@ def get_answers(model, api_key, query, temp, base_url=None) -> str:
     - For OpenRouter models, provide an OpenRouter key (`OPENROUTER_API_KEY`).
     - For Together models, provide a Together key (`TOGETHER_API_KEY`).
     """
+    # === Model Alias Normalization ===
+    # Map aliases to standard internal names
+    model_lower = model.lower().replace("_", "-")
+    if model_lower in ("gpt-3.5-turbo", "chatgpt"):
+        model_alias = "chatgpt"
+    elif model_lower in ("gpt-4", "gpt-4-turbo", "gpt4-turbo"):
+        model_alias = "gpt4-turbo"
+    else:
+        model_alias = model_lower
+
     # === OpenRouter Support ===
-    if model.startswith("openrouter"):
+    if model_alias.startswith("openrouter"):
         # Parse model name: everything after "openrouter-" is the remote model name
         openrouter_prefix = "openrouter"
         model_actual = "gpt-3.5-turbo"
-        if model == openrouter_prefix:
+        if model_alias == openrouter_prefix:
             model_actual = "gpt-3.5-turbo"
-        elif model.startswith("openrouter-"):
-            model_actual = model[len("openrouter-") :]
+        elif model_alias.startswith("openrouter-"):
+            model_actual = model_alias[len("openrouter-") :]
             if not model_actual:
                 model_actual = "gpt-3.5-turbo"
         # API key logic
@@ -49,7 +59,7 @@ def get_answers(model, api_key, query, temp, base_url=None) -> str:
         print(output)
         return output
 
-    if model == "codellama":
+    if model_alias == "codellama":
         # Together API key must start with "api-"
         if not api_key:
             api_key = os.getenv("TOGETHER_API_KEY")
@@ -78,7 +88,7 @@ def get_answers(model, api_key, query, temp, base_url=None) -> str:
 
         return text
     
-    elif model == "chatgpt":
+    elif model_alias == "chatgpt":
         # OpenAI API key must start with "sk-"
         if not api_key:
             api_key = os.getenv("OPENAI_API_KEY")
@@ -103,7 +113,7 @@ def get_answers(model, api_key, query, temp, base_url=None) -> str:
 
         return output
     
-    elif model == 'gpt4-turbo':
+    elif model_alias == 'gpt4-turbo':
         # OpenAI API key must start with "sk-"
         if not api_key:
             api_key = os.getenv("OPENAI_API_KEY")
@@ -129,7 +139,7 @@ def get_answers(model, api_key, query, temp, base_url=None) -> str:
         return output
 
     
-    elif model == "llama3":
+    elif model_alias == "llama3":
         # Together API key must start with "api-"
         if not api_key:
             api_key = os.getenv("TOGETHER_API_KEY")

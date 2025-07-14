@@ -234,13 +234,13 @@ def launch_web_ui():
             from src.retrieval import Retriever
             retriever = Retriever()
             retriever.add_example(query, macro)
-            return "Feedback recorded!"
+            return None
 
         def feedback_bad(query, macro):
             from src.retrieval import Retriever
             retriever = Retriever()
             retriever.add_negative_example(query, "User marked as bad result.")
-            return "Feedback recorded!"
+            return None
 
         run_btn.click(
             fn=infer,
@@ -253,7 +253,7 @@ def launch_web_ui():
         # Section 3 – Chat with Query2CAD AI
         gr.Markdown("## Chat with Query2CAD AI")
         chat_model = gr.Radio(MODEL_OPTIONS, value=MODEL_OPTIONS[0], label="Model")
-        chatbot = gr.Chatbot(label="Query2CAD Conversation")
+        chatbot = gr.Chatbot(label="Query2CAD Conversation", type="messages")
         chat_state = gr.State([])
 
         audio_components_visible = HAS_OPENAI
