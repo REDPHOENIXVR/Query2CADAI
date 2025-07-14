@@ -1,4 +1,5 @@
 import os
+import re
 from src.logger import get_logger
 
 logger = get_logger("utils")
@@ -8,21 +9,7 @@ def ensure_dir(path):
         os.makedirs(path)
         logger.info(f"Created directory: {path}")
 
-import os
-
 def ensure_startup_dirs():
-    dirs = [
-        "data/examples",
-        "data/cache",
-        "library/parts",
-        "library/index",
-        "results/bom",
-        "results/code",
-        "results/images",
-        "results/explanations",
-    ]
-    for d in dirs:
-        ensure_dir(d)
     """Ensure required directories exist at startup."""
     dirs = [
         "data/examples",
@@ -32,7 +19,7 @@ def ensure_startup_dirs():
         "results/bom",
         "results/code",
         "results/images",
-        "results/explanations"
+        "results/explanations",
     ]
     for d in dirs:
         ensure_dir(d)

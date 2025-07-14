@@ -114,6 +114,9 @@ class Retriever:
         Extra fields: tags (list), notes (str), status (default: good).
         If embedding is None and status=='good', compute embedding automatically.
         If embedding cannot be computed, log warning and still add to manifest.
+
+        Handles dynamic FAISS index dimension: If current index is None or has mismatched dimension,
+        rebuilds index to match embedding dimension.
         """
         with self.lock:
             example = {
@@ -132,6 +135,12 @@ class Retriever:
                         self._save()
                         logger.info(f"Example added: status={example['status']} (manifest only)")
                         return
+                emb_dim = len(embedding)
+                # If index is not built or dimension mismatches, rebuild it with correct dimension
+                if self.index is None or getattr(self.index, 'd', 0) != emb_dim:
+                    logger.info(f"[retrieval] Rebuilding FAISS index with dimension {emb_dim} to match embedding.")
+                    self.embedding_dim = emb_dim
+                    self._build_fresh()
                 self.index.add(np.array([embedding]).astype(np.float32))
                 logger.info(f"[retrieval/embedding] Example embedded and added to FAISS.")
             self._save()

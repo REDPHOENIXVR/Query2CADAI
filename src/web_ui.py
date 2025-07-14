@@ -234,13 +234,13 @@ def launch_web_ui():
             from src.retrieval import Retriever
             retriever = Retriever()
             retriever.add_example(query, macro)
-            return "Feedback recorded!"
+            return None
 
         def feedback_bad(query, macro):
             from src.retrieval import Retriever
             retriever = Retriever()
             retriever.add_negative_example(query, "User marked as bad result.")
-            return "Feedback recorded!"
+            return None
 
         run_btn.click(
             fn=infer,
