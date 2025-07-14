@@ -44,9 +44,9 @@ def get_bom_from_image(image_bytes, prompt_hint=""):
     import src.vision_bom as vision_bom
     return vision_bom.extract_bom(image_bytes, prompt_hint)
 
-def get_skeleton_macro(bom):
+def get_skeleton_macro(bom, param=None):
     import src.skeleton as skeleton
-    return skeleton.generate_skeleton(bom, None)
+    return skeleton.generate_skeleton(bom, param)
 
 def get_assembly_macro(bom):
     return assembly_builder.build_assembly(bom, pi_global)
@@ -140,8 +140,9 @@ def do_update_df(df):
     bom = df_to_bom(pd.DataFrame(df))
     return bom
 
-def do_skeleton(bom):
-    macro = get_skeleton_macro(bom)
+def do_skeleton(bom, h, leg, arm):
+    param = {"height": h, "leg_length": leg, "arm_length": arm}
+    macro = get_skeleton_macro(bom, param)
     path = save_macro_file(macro, "skeleton.FCMacro")
     return gr.update(value=path, visible=True), macro
 
@@ -332,6 +333,9 @@ def launch_web_ui():
                     interactive=True,
                     visible=False
                 )
+                height_slider = gr.Slider(100, 250, value=180, label="Height (cm)")
+                leg_slider = gr.Slider(30, 120, value=70, label="Leg length (cm)")
+                arm_slider = gr.Slider(20, 100, value=60, label="Arm length (cm)")
                 skeleton_btn = gr.Button("Generate skeleton", visible=False)
                 assembly_btn = gr.Button("Build assembly", visible=False)
                 macro_download = gr.File(label="Download Macro", visible=False)
@@ -352,7 +356,11 @@ def launch_web_ui():
             [bom_df, state_bom, skeleton_btn, assembly_btn, info_box]
         )
         bom_df.change(do_update_df, [bom_df], [state_bom])
-        skeleton_btn.click(lambda bom: do_skeleton(bom), [state_bom], [macro_download, state_macro])
+        skeleton_btn.click(
+            do_skeleton,
+            [state_bom, height_slider, leg_slider, arm_slider],
+            [macro_download, state_macro]
+        )
         assembly_btn.click(lambda bom: do_assembly(bom), [state_bom], [macro_download, state_macro])
         feedback.click(lambda: print("Feedback: thumbs up!"), None, None)
 
