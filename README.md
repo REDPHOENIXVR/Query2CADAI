@@ -25,21 +25,17 @@ This workflow takes you from a robot image to a FreeCAD macro for assembly or sk
 2. **Web UI**  
    - Launch with:  
      `python -m src.web_ui`  
-     By default, this launches the **Chat UI**, which includes both the Chat tab and the original pipeline UI.
-
-   - To launch just the original Humanoid Robot Pipeline UI (without Chat), use:  
-     `python -m src.web_ui --mode pipeline`
+     This launches the unified Query2CAD Web Interface on [http://localhost:7860](http://localhost:7860) (by default). All features are now available via tabs:
+       - **Pipeline**: Humanoid Robot Pipeline (image→BOM→macro, editable BOM, etc.)
+       - **Macro**: Text→macro generator (natural language to FreeCAD macro)
+       - **Chat**: Conversational Query2CAD AI, with voice input and chat history export
 
    **NEW: Text → Image → CAD Flow**
 
    You can now generate a concept image directly from a text prompt using the “Concept description” box and “Generate Image” button above the image upload. This uses OpenAI's DALL·E (or a compatible model) if available, or produces a placeholder image otherwise (see environment variable `OPENAI_IMAGE_MODEL`). After generating, you may review and proceed to extract the BOM as before.
 
-   **Modes:**  
-   - `chat` (default): Rich UI with Chat tab and all features.
-   - `pipeline`: Only the original Humanoid Robot Pipeline UI (no Chat).
-
    **Chat with Query2CAD AI:**  
-   The Web UI now includes a **Chat** tab by default, where you can have a free-form conversation with the Query2CAD AI assistant. You can type questions or requests in natural language, click **Send**, and receive AI responses in a conversational format. Use the **Clear** button to reset the chat history at any time. You can select the backend AI model using the radio button above the chat.  
+   The Web UI includes a **Chat** tab, where you can have a free-form conversation with the Query2CAD AI assistant. You can type questions or requests in natural language, click **Send**, and receive AI responses in a conversational format. Use the **Clear** button to reset the chat history at any time. You can select the backend AI model using the radio button above the chat.  
    You can also export your chat history at any time via the **Export History** button, which will generate a downloadable JSON file containing your conversation.
 
    **NEW: Voice/Microphone Input**
@@ -116,3 +112,44 @@ python -m src.parts_validator  # or --ai to auto-fill using GPT
 
 - Python 3.8+
 - pyyaml, sentence-transformers, faiss-cpu, pybullet, pandas, gradio, python-multipart
+
+# Adding the HOPEJr Robot Library
+
+You can import and fully process the HOPEJr robot library with a single command:
+```bash
+python -m src.import_hopejr  # copies, AI-validates, and rebuilds index
+```
+This command will:
+- Copy all HOPEJr STEP files into your parts library (with `hopejr_` prefix)
+- Generate rich metadata stubs (with category auto-detected from filename and `["hopejr"]` tag)
+- Use OpenAI to suggest improved metadata if `OPENAI_API_KEY` is set
+- Validate new parts using the AI validator
+- Rebuild the parts index
+
+To skip validation or indexing, use `--no-validator` or `--no-index`.
+
+To enrich your Query2CAD part library with a set of high-quality humanoid robot parts, you can import the open-source [HOPEJr](https://github.com/TheRobotStudio/HOPEJr) repository.
+
+## 1. Add the HOPEJr repository as a submodule
+
+```bash
+git submodule add https://github.com/TheRobotStudio/HOPEJr external/HOPEJr
+```
+
+## 2. Import the STEP files into Query2CAD
+
+```bash
+python -m src.import_hopejr
+```
+
+This will copy all STEP files from the HOPEJr repository into `library/parts/` (with a `hopejr_` prefix) and create minimal YAML metadata for each part.
+
+## 3. Rebuild the parts index
+
+```bash
+python -m src.build_parts_index
+```
+
+## 4. Licensing
+
+HOPEJr is licensed under [GPL-3.0](https://github.com/TheRobotStudio/HOPEJr/blob/master/LICENSE). Please review their repository and license before commercial or derivative use.

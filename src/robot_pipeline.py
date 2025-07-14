@@ -55,7 +55,7 @@ def main():
     idx = PartIndex()
     if idx.index is None or len(idx.parts) == 0:
         print("Building parts index …")
-        idx.build_index("library/parts")
+        idx.build_index()
     asm_code = build_assembly(bom, idx)
     asm_path = os.path.join(args.outdir, "assembly.FCMacro")
     with open(asm_path, "w") as f:
