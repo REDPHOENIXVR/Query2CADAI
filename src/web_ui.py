@@ -108,7 +108,13 @@ def do_extract(image, prompt_hint):
     if not image:
         return gr.update(visible=False), {}, gr.update(visible=False), gr.update(visible=False), update_info("No image provided.")
     info_update = update_info("Extracting BOM …")
-    bom = get_bom_from_image(image, prompt_hint)
+    # Unpack: corrected_bom, warnings
+    result = get_bom_from_image(image, prompt_hint)
+    if isinstance(result, tuple) and len(result) == 2:
+        bom, warnings = result
+    else:
+        bom, warnings = result, []
+
     df = load_bom_to_df(bom)
     visible = True if df is not None else False
     # Placeholder detection logic
@@ -119,7 +125,10 @@ def do_extract(image, prompt_hint):
     if placeholder:
         info_update = update_info("⚠️ Used placeholder BOM (vision failed)")
     else:
-        info_update = update_info("BOM extracted successfully")
+        info_msg = "BOM extracted successfully"
+        if warnings:
+            info_msg += "\nWarnings:\n" + "\n".join(warnings)
+        info_update = update_info(info_msg)
     return gr.update(visible=visible, value=df), bom, gr.update(visible=visible), gr.update(visible=visible), info_update
 
 def do_update_df(df):
