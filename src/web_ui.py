@@ -100,7 +100,8 @@ def do_generate(prompt):
         return gr.update(), update_info("No prompt provided.")
     from src.image_generator import generate_image
     info_update = update_info("Generating image…")
-    path = generate_image(prompt)
+    with gr.Progress(track_tqdm=False) as progress:
+        path = generate_image(prompt)
     info_update = update_info(f"Image generated: {path}")
     return gr.update(value=path), info_update
 
@@ -109,7 +110,8 @@ def do_extract(image, prompt_hint):
         return gr.update(visible=False), {}, gr.update(visible=False), gr.update(visible=False), update_info("No image provided.")
     info_update = update_info("Extracting BOM …")
     # Unpack: corrected_bom, warnings
-    result = get_bom_from_image(image, prompt_hint)
+    with gr.Progress(track_tqdm=False) as progress:
+        result = get_bom_from_image(image, prompt_hint)
     if isinstance(result, tuple) and len(result) == 2:
         bom, warnings = result
     else:
@@ -235,7 +237,15 @@ def launch_web_ui():
                 prompt_hint = gr.Textbox(label="Prompt hint (optional)", value="")
                 extract_btn = gr.Button("Extract BOM")
             with gr.Column():
-                bom_df = gr.Dataframe(label="Editable BOM", interactive=True, visible=False)
+                bom_df = gr.Dataframe(
+                    label="Editable BOM",
+                    headers=["type", "material", "component", "side"],
+                    column_config={
+                        "side": gr.ColumnDropdown(choices=["left", "right", "center", ""])
+                    },
+                    interactive=True,
+                    visible=False
+                )
                 skeleton_btn = gr.Button("Generate skeleton", visible=False)
                 assembly_btn = gr.Button("Build assembly", visible=False)
                 macro_download = gr.File(label="Download Macro", visible=False)
