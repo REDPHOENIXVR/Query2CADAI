@@ -165,7 +165,7 @@ def launch_web_ui():
         params = inspect.signature(gr.Chatbot).parameters
         if "type" in params:
             # Gradio 4.x expects the 'type' parameter
-            return gr.Chatbot(label="Query2CAD Conversation", type="python")
+            return gr.Chatbot(label="Query2CAD Conversation", type="tuples")  # Explicitly set type to suppress deprecation warning
         else:
             # Gradio 3.x does not accept 'type'
             return gr.Chatbot(label="Query2CAD Conversation")
