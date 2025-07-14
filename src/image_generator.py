@@ -65,6 +65,13 @@ def generate_image(prompt: str, size: str = "1024x1024", outdir: str = "results/
     except ImportError:
         raise RuntimeError("Pillow is required for placeholder image generation")
 
+    # Use the possibly truncated prompt for the placeholder image text, too
+    max_chars = int(os.environ.get("OPENAI_IMAGE_PROMPT_MAX_CHARS", 4000))
+    truncated_prompt = None
+    if len(prompt) > max_chars:
+        truncated_prompt = prompt[: max_chars - 3] + "..."
+    prompt_to_use = truncated_prompt if truncated_prompt is not None else prompt
+
     img = Image.new("RGB", (512, 512), (180, 180, 180))
     draw = ImageDraw.Draw(img)
     font = None
@@ -72,7 +79,7 @@ def generate_image(prompt: str, size: str = "1024x1024", outdir: str = "results/
         font = ImageFont.truetype("arial.ttf", 20)
     except Exception:
         font = ImageFont.load_default()
-    text = prompt.strip() or "(no prompt)"
+    text = prompt_to_use.strip() or "(no prompt)"
     lines = []
     max_width = 480
     # Simple word wrap
