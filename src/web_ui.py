@@ -157,6 +157,19 @@ def launch_web_ui():
             }
         return gr.Audio(**kwargs)
 
+    def _create_chatbot():
+        """
+        Helper to instantiate gr.Chatbot with compatible arguments for Gradio 3.x and 4.x,
+        avoiding deprecation warnings for the 'label' and 'type' parameters.
+        """
+        params = inspect.signature(gr.Chatbot).parameters
+        if "type" in params:
+            # Gradio 4.x expects the 'type' parameter
+            return gr.Chatbot(label="Query2CAD Conversation", type="python")
+        else:
+            # Gradio 3.x does not accept 'type'
+            return gr.Chatbot(label="Query2CAD Conversation")
+
     def infer(query, model, parametric, explain):
         prompt = query
         if parametric:
@@ -253,7 +266,7 @@ def launch_web_ui():
         # Section 3 – Chat with Query2CAD AI
         gr.Markdown("## Chat with Query2CAD AI")
         chat_model = gr.Radio(MODEL_OPTIONS, value=MODEL_OPTIONS[0], label="Model")
-        chatbot = gr.Chatbot(label="Query2CAD Conversation")
+        chatbot = _create_chatbot()
         chat_state = gr.State([])
 
         audio_components_visible = HAS_OPENAI
