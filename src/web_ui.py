@@ -253,7 +253,7 @@ def launch_web_ui():
         # Section 3 – Chat with Query2CAD AI
         gr.Markdown("## Chat with Query2CAD AI")
         chat_model = gr.Radio(MODEL_OPTIONS, value=MODEL_OPTIONS[0], label="Model")
-        chatbot = gr.Chatbot(label="Query2CAD Conversation", type="messages")
+        chatbot = gr.Chatbot(label="Query2CAD Conversation")
         chat_state = gr.State([])
 
         audio_components_visible = HAS_OPENAI
