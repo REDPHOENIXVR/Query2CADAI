@@ -164,169 +164,167 @@ def launch_web_ui():
 
     with gr.Blocks() as demo:
         gr.Markdown("# Query2CAD Web Interface")
-        with gr.Tabs():
-            # Pipeline Tab
-            with gr.Tab("Pipeline"):
-                gr.Markdown("### Humanoid Robot Pipeline")
-                with gr.Row():
-                    with gr.Column():
-                        concept_prompt = gr.Textbox(label="Concept description (optional)", lines=2, value="")
-                        gen_image_btn = gr.Button("Generate Image")
-                        image_input = gr.Image(type="filepath", label="Upload Robot Image")
-                        prompt_hint = gr.Textbox(label="Prompt hint (optional)", value="")
-                        extract_btn = gr.Button("Extract BOM")
-                    with gr.Column():
-                        bom_df = gr.Dataframe(label="Editable BOM", interactive=True, visible=False)
-                        skeleton_btn = gr.Button("Generate skeleton", visible=False)
-                        assembly_btn = gr.Button("Build assembly", visible=False)
-                        macro_download = gr.File(label="Download Macro", visible=False)
-                        feedback = gr.Button("👍", visible=True)
-                state_bom = gr.State({})
-                state_macro = gr.State("")
 
-                # Hook text→image generation button
-                gen_image_btn.click(
-                    do_generate,
-                    inputs=[concept_prompt],
-                    outputs=image_input,
-                )
-                extract_btn.click(do_extract, [image_input, prompt_hint], [bom_df, state_bom, skeleton_btn, assembly_btn])
-                bom_df.change(do_update_df, [bom_df], [state_bom])
-                skeleton_btn.click(lambda bom: do_skeleton(bom), [state_bom], [macro_download, state_macro])
-                assembly_btn.click(lambda bom: do_assembly(bom), [state_bom], [macro_download, state_macro])
-                feedback.click(lambda: print("Feedback: thumbs up!"), None, None)
+        # Section 1 – Humanoid Robot Pipeline
+        gr.Markdown("## Humanoid Robot Pipeline")
+        with gr.Row():
+            with gr.Column():
+                concept_prompt = gr.Textbox(label="Concept description (optional)", lines=2, value="")
+                gen_image_btn = gr.Button("Generate Image")
+                image_input = gr.Image(type="filepath", label="Upload Robot Image")
+                prompt_hint = gr.Textbox(label="Prompt hint (optional)", value="")
+                extract_btn = gr.Button("Extract BOM")
+            with gr.Column():
+                bom_df = gr.Dataframe(label="Editable BOM", interactive=True, visible=False)
+                skeleton_btn = gr.Button("Generate skeleton", visible=False)
+                assembly_btn = gr.Button("Build assembly", visible=False)
+                macro_download = gr.File(label="Download Macro", visible=False)
+                feedback = gr.Button("👍", visible=True)
+        state_bom = gr.State({})
+        state_macro = gr.State("")
 
-            # Macro/Main Tab
-            with gr.Tab("Macro"):
-                query = gr.Textbox(label="Enter CAD query", lines=3)
-                model = gr.Radio(MODEL_OPTIONS, value=MODEL_OPTIONS[0], label="Model")
-                parametric = gr.Checkbox(label="Parametric", value=False)
-                explain = gr.Checkbox(label="Explain steps", value=False)
-                run_btn = gr.Button("Run")
-                macro_out = gr.Textbox(label="Generated Macro")
-                explanation_out = gr.Textbox(label="Macro Explanation", visible=True)
-                with gr.Row():
-                    thumbs_up = gr.Button("👍 Good")
-                    thumbs_down = gr.Button("👎 Needs Fix")
+        # Hook text→image generation button
+        gen_image_btn.click(
+            do_generate,
+            inputs=[concept_prompt],
+            outputs=image_input,
+        )
+        extract_btn.click(do_extract, [image_input, prompt_hint], [bom_df, state_bom, skeleton_btn, assembly_btn])
+        bom_df.change(do_update_df, [bom_df], [state_bom])
+        skeleton_btn.click(lambda bom: do_skeleton(bom), [state_bom], [macro_download, state_macro])
+        assembly_btn.click(lambda bom: do_assembly(bom), [state_bom], [macro_download, state_macro])
+        feedback.click(lambda: print("Feedback: thumbs up!"), None, None)
 
-                def feedback_good(query, macro):
-                    from src.retrieval import Retriever
-                    retriever = Retriever()
-                    retriever.add_example(query, macro)
-                    return "Feedback recorded!"
+        # Section 2 – Macro Generator
+        gr.Markdown("## Macro Generator")
+        query = gr.Textbox(label="Enter CAD query", lines=3)
+        model = gr.Radio(MODEL_OPTIONS, value=MODEL_OPTIONS[0], label="Model")
+        parametric = gr.Checkbox(label="Parametric", value=False)
+        explain = gr.Checkbox(label="Explain steps", value=False)
+        run_btn = gr.Button("Run")
+        macro_out = gr.Textbox(label="Generated Macro")
+        explanation_out = gr.Textbox(label="Macro Explanation", visible=True)
+        with gr.Row():
+            thumbs_up = gr.Button("👍 Good")
+            thumbs_down = gr.Button("👎 Needs Fix")
 
-                def feedback_bad(query, macro):
-                    from src.retrieval import Retriever
-                    retriever = Retriever()
-                    retriever.add_negative_example(query, "User marked as bad result.")
-                    return "Feedback recorded!"
+        def feedback_good(query, macro):
+            from src.retrieval import Retriever
+            retriever = Retriever()
+            retriever.add_example(query, macro)
+            return "Feedback recorded!"
 
-                run_btn.click(
-                    fn=infer,
-                    inputs=[query, model, parametric, explain],
-                    outputs=[macro_out, explanation_out]
-                )
-                thumbs_up.click(fn=feedback_good, inputs=[query, macro_out], outputs=None)
-                thumbs_down.click(fn=feedback_bad, inputs=[query, macro_out], outputs=None)
+        def feedback_bad(query, macro):
+            from src.retrieval import Retriever
+            retriever = Retriever()
+            retriever.add_negative_example(query, "User marked as bad result.")
+            return "Feedback recorded!"
 
-            # Chat Tab
-            with gr.Tab("Chat"):
-                gr.Markdown("### Chat with Query2CAD AI")
-                chat_model = gr.Radio(MODEL_OPTIONS, value=MODEL_OPTIONS[0], label="Model")
-                chatbot = gr.Chatbot(label="Query2CAD Conversation")
-                chat_state = gr.State([])
+        run_btn.click(
+            fn=infer,
+            inputs=[query, model, parametric, explain],
+            outputs=[macro_out, explanation_out]
+        )
+        thumbs_up.click(fn=feedback_good, inputs=[query, macro_out], outputs=None)
+        thumbs_down.click(fn=feedback_bad, inputs=[query, macro_out], outputs=None)
 
-                audio_components_visible = HAS_OPENAI
-                audio_row = None
-                audio_in = None
-                send_audio_btn = None
-                audio_warning_box = None
+        # Section 3 – Chat with Query2CAD AI
+        gr.Markdown("## Chat with Query2CAD AI")
+        chat_model = gr.Radio(MODEL_OPTIONS, value=MODEL_OPTIONS[0], label="Model")
+        chatbot = gr.Chatbot(label="Query2CAD Conversation")
+        chat_state = gr.State([])
 
-                if audio_components_visible:
-                    with gr.Row():
-                        audio_in = gr.Audio(source="microphone", type="filepath", label="🎤 Record", scale=4)
-                        send_audio_btn = gr.Button("Send Audio", scale=1)
-                    audio_warning_box = gr.Markdown("", visible=False)
+        audio_components_visible = HAS_OPENAI
+        audio_row = None
+        audio_in = None
+        send_audio_btn = None
+        audio_warning_box = None
+
+        if audio_components_visible:
+            with gr.Row():
+                audio_in = gr.Audio(source="microphone", type="filepath", label="🎤 Record", scale=4)
+                send_audio_btn = gr.Button("Send Audio", scale=1)
+            audio_warning_box = gr.Markdown("", visible=False)
+        else:
+            audio_warning_box = gr.Markdown(
+                "⚠️ Voice input requires the `openai` Python package. Install with `pip install openai`.",
+                visible=True,
+            )
+
+        with gr.Row():
+            user_message = gr.Textbox(
+                label=None, 
+                placeholder="Ask Query2CAD AI...",
+                lines=2,
+                scale=6,
+            )
+            send_btn = gr.Button("Send", scale=1)
+            clear_btn = gr.Button("Clear", scale=1)
+            export_btn = gr.Button("Export History", scale=1)
+
+        export_file = gr.File(label="Download Chat History (JSON)", visible=False, interactive=True, file_types=[".json"])
+
+        def transcribe_and_send(audio_filepath, chat_state, chat_model):
+            if not HAS_OPENAI:
+                return gr.update(), chat_state, gr.update(value="⚠️ openai package not installed.", visible=True)
+            if not audio_filepath:
+                return gr.update(), chat_state, gr.update(value="⚠️ Please record audio before sending.", visible=True)
+            api_key = os.environ.get("OPENAI_API_KEY", None)
+            if not api_key:
+                return gr.update(), chat_state, gr.update(value="⚠️ Please set your OPENAI_API_KEY environment variable to enable audio transcription.", visible=True)
+            try:
+                with open(audio_filepath, "rb") as f:
+                    transcript = openai.audio.transcriptions.transcribe("whisper-1", f, api_key=api_key)
+                if isinstance(transcript, dict):
+                    text = transcript.get("text", "")
                 else:
-                    audio_warning_box = gr.Markdown(
-                        "⚠️ Voice input requires the `openai` Python package. Install with `pip install openai`.",
-                        visible=True,
-                    )
+                    text = transcript
+                if not text.strip():
+                    return gr.update(), chat_state, gr.update(value="⚠️ No transcription result.", visible=True)
+            except Exception as e:
+                return gr.update(), chat_state, gr.update(value=f"⚠️ Transcription failed: {e}", visible=True)
+            chat_result, new_state = chat_send(text, chat_state, chat_model)
+            return chat_result, new_state, gr.update(value="", visible=False)
 
-                with gr.Row():
-                    user_message = gr.Textbox(
-                        label=None, 
-                        placeholder="Ask Query2CAD AI...",
-                        lines=2,
-                        scale=6,
-                    )
-                    send_btn = gr.Button("Send", scale=1)
-                    clear_btn = gr.Button("Clear", scale=1)
-                    export_btn = gr.Button("Export History", scale=1)
+        send_btn.click(
+            fn=chat_send,
+            inputs=[user_message, chat_state, chat_model],
+            outputs=[chatbot, chat_state]
+        )
+        clear_btn.click(
+            fn=chat_clear,
+            inputs=None,
+            outputs=[chatbot, chat_state]
+        )
+        # Audio send logic
+        if audio_components_visible and send_audio_btn and audio_in:
+            send_audio_btn.click(
+                fn=transcribe_and_send,
+                inputs=[audio_in, chat_state, chat_model],
+                outputs=[chatbot, chat_state, audio_warning_box]
+            )
 
-                export_file = gr.File(label="Download Chat History (JSON)", visible=False, interactive=True, file_types=[".json"])
+        def export_chat_history(chat_history):
+            if not chat_history or len(chat_history) == 0:
+                return gr.update(visible=False, value=None)
+            export_dir = os.path.join("results", "chat_history")
+            utils.ensure_dir(export_dir)
+            data = [
+                {"user": u, "assistant": a}
+                for (u, a) in chat_history
+            ]
+            now = datetime.now().strftime("%Y%m%d_%H%M%S")
+            fname = f"chat_{now}.json"
+            fpath = os.path.join(export_dir, fname)
+            with open(fpath, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            return gr.update(value=fpath, visible=True)
 
-                def transcribe_and_send(audio_filepath, chat_state, chat_model):
-                    if not HAS_OPENAI:
-                        return gr.update(), chat_state, gr.update(value="⚠️ openai package not installed.", visible=True)
-                    if not audio_filepath:
-                        return gr.update(), chat_state, gr.update(value="⚠️ Please record audio before sending.", visible=True)
-                    api_key = os.environ.get("OPENAI_API_KEY", None)
-                    if not api_key:
-                        return gr.update(), chat_state, gr.update(value="⚠️ Please set your OPENAI_API_KEY environment variable to enable audio transcription.", visible=True)
-                    try:
-                        with open(audio_filepath, "rb") as f:
-                            transcript = openai.audio.transcriptions.transcribe("whisper-1", f, api_key=api_key)
-                        if isinstance(transcript, dict):
-                            text = transcript.get("text", "")
-                        else:
-                            text = transcript
-                        if not text.strip():
-                            return gr.update(), chat_state, gr.update(value="⚠️ No transcription result.", visible=True)
-                    except Exception as e:
-                        return gr.update(), chat_state, gr.update(value=f"⚠️ Transcription failed: {e}", visible=True)
-                    chat_result, new_state = chat_send(text, chat_state, chat_model)
-                    return chat_result, new_state, gr.update(value="", visible=False)
-
-                send_btn.click(
-                    fn=chat_send,
-                    inputs=[user_message, chat_state, chat_model],
-                    outputs=[chatbot, chat_state]
-                )
-                clear_btn.click(
-                    fn=chat_clear,
-                    inputs=None,
-                    outputs=[chatbot, chat_state]
-                )
-                # Audio send logic
-                if audio_components_visible and send_audio_btn and audio_in:
-                    send_audio_btn.click(
-                        fn=transcribe_and_send,
-                        inputs=[audio_in, chat_state, chat_model],
-                        outputs=[chatbot, chat_state, audio_warning_box]
-                    )
-
-                def export_chat_history(chat_history):
-                    if not chat_history or len(chat_history) == 0:
-                        return gr.update(visible=False, value=None)
-                    export_dir = os.path.join("results", "chat_history")
-                    utils.ensure_dir(export_dir)
-                    data = [
-                        {"user": u, "assistant": a}
-                        for (u, a) in chat_history
-                    ]
-                    now = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    fname = f"chat_{now}.json"
-                    fpath = os.path.join(export_dir, fname)
-                    with open(fpath, "w", encoding="utf-8") as f:
-                        json.dump(data, f, indent=2, ensure_ascii=False)
-                    return gr.update(value=fpath, visible=True)
-
-                export_btn.click(
-                    fn=export_chat_history,
-                    inputs=[chat_state],
-                    outputs=[export_file],
-                )
+        export_btn.click(
+            fn=export_chat_history,
+            inputs=[chat_state],
+            outputs=[export_file],
+        )
 
     demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)))
 
