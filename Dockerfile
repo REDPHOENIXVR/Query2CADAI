@@ -7,4 +7,4 @@ COPY . /app
 RUN pip install --no-cache-dir -r requirements.txt
 
 # default to launching the web UI so no pyautogui / GUI automation is required
-CMD ["python", "-m", "src.web_ui"]
+CMD ["python", "-m", "src"]

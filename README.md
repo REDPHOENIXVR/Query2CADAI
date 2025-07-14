@@ -24,11 +24,13 @@ This workflow takes you from a robot image to a FreeCAD macro for assembly or sk
 
 2. **Web UI**  
    - Launch with:  
-     `python -m src.web_ui`  
+     `python -m src`  
      This launches the unified Query2CAD Web Interface on [http://localhost:7860](http://localhost:7860) (by default). All features are now available via tabs:
        - **Pipeline**: Humanoid Robot Pipeline (image→BOM→macro, editable BOM, etc.)
        - **Macro**: Text→macro generator (natural language to FreeCAD macro)
        - **Chat**: Conversational Query2CAD AI, with voice input and chat history export
+
+   > **Note:** The all-in-one interface is always launched with `python -m src` (or via the `query2cadai` script if installed as a package). There is no longer a separate "pipeline-only" mode; all features are unified in this interface.
 
    **NEW: Text → Image → CAD Flow**
 
