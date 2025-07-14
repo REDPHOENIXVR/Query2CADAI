@@ -308,12 +308,16 @@ def launch_web_ui():
             if not api_key:
                 return gr.update(), chat_state, gr.update(value="⚠️ Please set your OPENAI_API_KEY environment variable to enable audio transcription.", visible=True)
             try:
+                # Set API key globally for openai>=1.12.0+
+                openai.api_key = api_key
                 with open(audio_filepath, "rb") as f:
-                    transcript = openai.audio.transcriptions.transcribe("whisper-1", f, api_key=api_key)
-                if isinstance(transcript, dict):
+                    transcript = openai.audio.transcriptions.create(model="whisper-1", file=f)
+                # Prefer transcript.text, fallback to dict["text"] if necessary
+                text = getattr(transcript, "text", None)
+                if text is None and isinstance(transcript, dict):
                     text = transcript.get("text", "")
-                else:
-                    text = transcript
+                if text is None:
+                    text = ""
                 if not text.strip():
                     return gr.update(), chat_state, gr.update(value="⚠️ No transcription result.", visible=True)
             except Exception as e:
