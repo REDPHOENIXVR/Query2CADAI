@@ -29,7 +29,6 @@ def _lazy_import_pandas():
         return None
 
 def _lazy_import():
-    # For lazy loading new modules
     import importlib
     return importlib
 
@@ -48,7 +47,6 @@ def get_skeleton_macro(bom):
     return skeleton.generate_skeleton(bom, None)
 
 def get_assembly_macro(bom):
-    # build assembly using cached global PartIndex
     return assembly_builder.build_assembly(bom, pi_global)
 
 def save_macro_file(macro_code, fname):
@@ -62,7 +60,6 @@ def load_bom_to_df(bom):
     pd = _lazy_import_pandas()
     if not pd:
         return None
-    # Flatten dict for DataFrame (head, torso, legs, arms)
     flat = []
     for k in ["head", "torso"]:
         val = bom.get(k, {})
@@ -77,7 +74,6 @@ def load_bom_to_df(bom):
     return pd.DataFrame(flat)
 
 def df_to_bom(df):
-    # Rebuild dict from DataFrame
     if df is None:
         return {}
     group = {"head": {}, "torso": {}, "legs": [], "arms": []}
@@ -94,80 +90,37 @@ def df_to_bom(df):
             group["arms"].append(d)
     return group
 
-def ui_main():
-    # Unified and cleaned-up pipeline UI with integrated Text→Image widgets.
-    def do_generate(prompt):
-        if not prompt.strip():
-            return gr.update()
-        from src.image_generator import generate_image
-        path = generate_image(prompt)
-        return gr.update(value=path)
+def do_generate(prompt):
+    if not prompt.strip():
+        return gr.update()
+    from src.image_generator import generate_image
+    path = generate_image(prompt)
+    return gr.update(value=path)
 
-    import gradio as gr
+def do_extract(image, prompt_hint):
+    if not image:
+        return gr.update(visible=False), {}, gr.update(visible=False), gr.update(visible=False)
+    bom = get_bom_from_image(image, prompt_hint)
+    df = load_bom_to_df(bom)
+    visible = True if df is not None else False
+    return gr.update(visible=visible, value=df), bom, gr.update(visible=visible), gr.update(visible=visible)
 
-    with gr.Blocks() as demo:
-        gr.Markdown("# Query2CAD Humanoid Robot Pipeline")
-        with gr.Row():
-            with gr.Column():
-                # Text-to-image widgets integrated above image_input
-                concept_prompt = gr.Textbox(label="Concept description (optional)", lines=2, value="")
-                gen_image_btn = gr.Button("Generate Image")
-                image_input = gr.Image(type="filepath", label="Upload Robot Image")
-                prompt_hint = gr.Textbox(label="Prompt hint (optional)", value="")
-                extract_btn = gr.Button("Extract BOM")
-            with gr.Column():
-                bom_df = gr.Dataframe(label="Editable BOM", interactive=True, visible=False)
-                skeleton_btn = gr.Button("Generate skeleton", visible=False)
-                assembly_btn = gr.Button("Build assembly", visible=False)
-                macro_download = gr.File(label="Download Macro", visible=False)
-                feedback = gr.Button("👍", visible=True)
-        state_bom = gr.State({})
-        state_macro = gr.State("")
+def do_update_df(df):
+    pd = _lazy_import_pandas()
+    if not pd or df is None:
+        return {}
+    bom = df_to_bom(pd.DataFrame(df))
+    return bom
 
-        # Hook text→image generation button to do_generate, updating image_input
-        gen_image_btn.click(
-            do_generate,
-            inputs=[concept_prompt],
-            outputs=image_input,
-        )
+def do_skeleton(bom):
+    macro = get_skeleton_macro(bom)
+    path = save_macro_file(macro, "skeleton.FCMacro")
+    return gr.update(value=path, visible=True), macro
 
-        def do_extract(image, prompt_hint):
-            if not image:
-                return gr.update(visible=False), {}, gr.update(visible=False), gr.update(visible=False)
-            bom = get_bom_from_image(image, prompt_hint)
-            df = load_bom_to_df(bom)
-            visible = True if df is not None else False
-            return gr.update(visible=visible, value=df), bom, gr.update(visible=visible), gr.update(visible=visible)
-
-        def do_update_df(df):
-            pd = _lazy_import_pandas()
-            if not pd or df is None:
-                return {}
-            bom = df_to_bom(pd.DataFrame(df))
-            return bom
-
-        def do_skeleton(bom):
-            macro = get_skeleton_macro(bom)
-            path = save_macro_file(macro, "skeleton.FCMacro")
-            return gr.update(value=path, visible=True), macro
-
-        def do_assembly(bom):
-            macro = get_assembly_macro(bom)
-            path = save_macro_file(macro, "assembly.FCMacro")
-            return gr.update(value=path, visible=True), macro
-
-        extract_btn.click(do_extract, [image_input, prompt_hint], [bom_df, state_bom, skeleton_btn, assembly_btn])
-        bom_df.change(do_update_df, [bom_df], [state_bom])
-        skeleton_btn.click(lambda bom: do_skeleton(bom), [state_bom], [macro_download, state_macro])
-        assembly_btn.click(lambda bom: do_assembly(bom), [state_bom], [macro_download, state_macro])
-
-        feedback.click(lambda: print("Feedback: thumbs up!"), None, None)
-
-    return demo
-
-import argparse
-
-# ... (rest of code remains unchanged above)
+def do_assembly(bom):
+    macro = get_assembly_macro(bom)
+    path = save_macro_file(macro, "assembly.FCMacro")
+    return gr.update(value=path, visible=True), macro
 
 from src.cache import cached_get_answers
 from src.prompts import get_parametric_prompt, get_explanation_prompt
@@ -190,25 +143,19 @@ def launch_web_ui():
         explanation = ""
         if explain:
             explanation = cached_get_answers(model, get_explanation_prompt(macro))
-        # TODO: Render CAD image (placeholder)
         return macro, explanation
 
     def chat_send(user_message, chat_history, model):
-        # Append user message (assistant response = None for now)
         if not user_message.strip():
-            return gr.update(), chat_history  # Don't submit empty
+            return gr.update(), chat_history
         chat_history = chat_history or []
         chat_history.append((user_message, None))
-        # Build prompt from history
         prompt_parts = []
         for u, a in chat_history[:-1]:
             prompt_parts.append(f"User: {u}\nAI: {a if a is not None else ''}")
-        # Add latest message, with AI: as last line
         prompt_parts.append(f"User: {user_message}\nAI:")
         prompt = "\n".join(prompt_parts)
-        # Call model
         assistant_response = cached_get_answers(model, prompt)
-        # Update last tuple with response
         chat_history[-1] = (user_message, assistant_response)
         return chat_history, chat_history
 
@@ -216,9 +163,41 @@ def launch_web_ui():
         return [], []
 
     with gr.Blocks() as demo:
-        gr.Markdown("# Query2CAD Web UI")
+        gr.Markdown("# Query2CAD Web Interface")
         with gr.Tabs():
-            with gr.Tab("Main"):
+            # Pipeline Tab
+            with gr.Tab("Pipeline"):
+                gr.Markdown("### Humanoid Robot Pipeline")
+                with gr.Row():
+                    with gr.Column():
+                        concept_prompt = gr.Textbox(label="Concept description (optional)", lines=2, value="")
+                        gen_image_btn = gr.Button("Generate Image")
+                        image_input = gr.Image(type="filepath", label="Upload Robot Image")
+                        prompt_hint = gr.Textbox(label="Prompt hint (optional)", value="")
+                        extract_btn = gr.Button("Extract BOM")
+                    with gr.Column():
+                        bom_df = gr.Dataframe(label="Editable BOM", interactive=True, visible=False)
+                        skeleton_btn = gr.Button("Generate skeleton", visible=False)
+                        assembly_btn = gr.Button("Build assembly", visible=False)
+                        macro_download = gr.File(label="Download Macro", visible=False)
+                        feedback = gr.Button("👍", visible=True)
+                state_bom = gr.State({})
+                state_macro = gr.State("")
+
+                # Hook text→image generation button
+                gen_image_btn.click(
+                    do_generate,
+                    inputs=[concept_prompt],
+                    outputs=image_input,
+                )
+                extract_btn.click(do_extract, [image_input, prompt_hint], [bom_df, state_bom, skeleton_btn, assembly_btn])
+                bom_df.change(do_update_df, [bom_df], [state_bom])
+                skeleton_btn.click(lambda bom: do_skeleton(bom), [state_bom], [macro_download, state_macro])
+                assembly_btn.click(lambda bom: do_assembly(bom), [state_bom], [macro_download, state_macro])
+                feedback.click(lambda: print("Feedback: thumbs up!"), None, None)
+
+            # Macro/Main Tab
+            with gr.Tab("Macro"):
                 query = gr.Textbox(label="Enter CAD query", lines=3)
                 model = gr.Radio(MODEL_OPTIONS, value=MODEL_OPTIONS[0], label="Model")
                 parametric = gr.Checkbox(label="Parametric", value=False)
@@ -233,7 +212,6 @@ def launch_web_ui():
                 def feedback_good(query, macro):
                     from src.retrieval import Retriever
                     retriever = Retriever()
-                    # No embedding parameter needed; handled internally
                     retriever.add_example(query, macro)
                     return "Feedback recorded!"
 
@@ -251,17 +229,14 @@ def launch_web_ui():
                 thumbs_up.click(fn=feedback_good, inputs=[query, macro_out], outputs=None)
                 thumbs_down.click(fn=feedback_bad, inputs=[query, macro_out], outputs=None)
 
+            # Chat Tab
             with gr.Tab("Chat"):
                 gr.Markdown("### Chat with Query2CAD AI")
-                # Use the same model selection as in Main tab
                 chat_model = gr.Radio(MODEL_OPTIONS, value=MODEL_OPTIONS[0], label="Model")
                 chatbot = gr.Chatbot(label="Query2CAD Conversation")
-                chat_state = gr.State([])  # List of (user, assistant) tuples
+                chat_state = gr.State([])
 
-                # --- Voice input section ---
-                # Only show if openai is installed
                 audio_components_visible = HAS_OPENAI
-
                 audio_row = None
                 audio_in = None
                 send_audio_btn = None
@@ -291,13 +266,10 @@ def launch_web_ui():
 
                 export_file = gr.File(label="Download Chat History (JSON)", visible=False, interactive=True, file_types=[".json"])
 
-                # --- Audio-to-text and send logic ---
                 def transcribe_and_send(audio_filepath, chat_state, chat_model):
-                    # Hide warning box by default
                     if not HAS_OPENAI:
                         return gr.update(), chat_state, gr.update(value="⚠️ openai package not installed.", visible=True)
                     if not audio_filepath:
-                        # No audio file to transcribe
                         return gr.update(), chat_state, gr.update(value="⚠️ Please record audio before sending.", visible=True)
                     api_key = os.environ.get("OPENAI_API_KEY", None)
                     if not api_key:
@@ -313,10 +285,8 @@ def launch_web_ui():
                             return gr.update(), chat_state, gr.update(value="⚠️ No transcription result.", visible=True)
                     except Exception as e:
                         return gr.update(), chat_state, gr.update(value=f"⚠️ Transcription failed: {e}", visible=True)
-                    # Use chat_send to continue as user message
                     chat_result, new_state = chat_send(text, chat_state, chat_model)
                     return chat_result, new_state, gr.update(value="", visible=False)
-
 
                 send_btn.click(
                     fn=chat_send,
@@ -328,10 +298,14 @@ def launch_web_ui():
                     inputs=None,
                     outputs=[chatbot, chat_state]
                 )
+                # Audio send logic
+                if audio_components_visible and send_audio_btn and audio_in:
+                    send_audio_btn.click(
+                        fn=transcribe_and_send,
+                        inputs=[audio_in, chat_state, chat_model],
+                        outputs=[chatbot, chat_state, audio_warning_box]
+                    )
 
-                # Audio send logic: already connected above if HAS_OPENAI
-
-                # Export chat history (keep only one definition)
                 def export_chat_history(chat_history):
                     if not chat_history or len(chat_history) == 0:
                         return gr.update(visible=False, value=None)
@@ -357,21 +331,9 @@ def launch_web_ui():
     demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)))
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Query2CAD Web UI Launcher")
-    parser.add_argument(
-        "--mode",
-        choices=["chat", "pipeline"],
-        default="chat",
-        help="Which UI to launch: 'chat' (default, with Chat tab) or 'pipeline' (Humanoid Robot Pipeline only)."
-    )
-    args = parser.parse_args()
-
     if HAS_GRADIO:
         utils.ensure_startup_dirs()
-        if args.mode == "pipeline":
-            ui_main().launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", 7860)))
-        else:
-            launch_web_ui()
+        launch_web_ui()
     else:
         logger = logging.getLogger("web_ui")
         logger.warning("Gradio not installed; skipping web UI launch.")
