@@ -1,7 +1,14 @@
 def generate_skeleton(bom, param=None):
     """
-    Generates FreeCAD macro as a string placing basic geometry, scaled according to parametric sizes.
-    param: dict with keys {"height", "leg_length", "arm_length"} in cm (floats).
+    Generates a FreeCAD macro as a string for basic humanoid skeleton geometry, scaled by parametric sizes.
+    Optionally, if the BOM dict contains 'joints', creates visual spheres at joint coordinates.
+
+    Args:
+        bom (dict): BOM dictionary with possible keys: "head", "torso", "legs", "arms", and optional "joints".
+        param (dict, optional): {"height", "leg_length", "arm_length"} in cm.
+
+    Returns:
+        str: FreeCAD macro string.
     """
     # Defaults
     defaults = {"height": 180.0, "leg_length": 70.0, "arm_length": 60.0}
@@ -86,5 +93,25 @@ def generate_skeleton(bom, param=None):
                 f"arm{idx} = Part.makeCylinder(arm_radius, arm_length_cm, FreeCAD.Vector({x}, {y_attach}, {z_attach}))"
             )
             macro.append(f"Part.show(arm{idx})")
+
+    # Joints (optional)
+    joints = bom.get("joints")
+    if joints and isinstance(joints, list):
+        macro.append("# --- Visualize joints as spheres ---")
+        for idx, joint in enumerate(joints):
+            # Expecting {"x":..., "y":..., "z":...} in millimeters
+            try:
+                x = float(joint["x"])
+                y = float(joint["y"])
+                z = float(joint["z"])
+            except (KeyError, TypeError, ValueError):
+                continue  # skip malformed joint entry
+            macro.append(
+                f"joint_sphere_{idx} = Part.makeSphere(4.0, FreeCAD.Vector({x}, {y}, {z}))"
+            )
+            macro.append(
+                f"Draft.setColor(joint_sphere_{idx}, (1.0, 0.2, 0.2))"
+            )
+            macro.append(f"Part.show(joint_sphere_{idx})")
     macro.append("FreeCAD.ActiveDocument.recompute()")
     return "\n".join(macro)
